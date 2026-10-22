@@ -96,6 +96,7 @@ a {
 }
 
 select,
+textarea,
 input[type="password"],
 input[type="text"] {
   background: var(--bg);
@@ -104,6 +105,12 @@ input[type="text"] {
   border-radius: 6px;
   padding: 5px 6px;
   font: inherit;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
 }
 
 input[type="range"] {

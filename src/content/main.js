@@ -14,6 +14,8 @@
     "asrEnabled",
     "asrEngine",
     "asrLang",
+    "glossaryMode",
+    "customTerms",
   ];
   const connection = LTV.createConnection();
   const bridge = LTV.bridge;
@@ -125,20 +127,27 @@
 
   function createQueue(session, captions, sl) {
     const tl = state.settings.targetLang;
+    const title = captions.title || document.title;
+    // Lĩnh vực (vd. cờ vua) để áp từ điển thuật ngữ khi dịch.
+    const domain = LTV.glossary.domainFor(state.settings, {
+      title,
+      texts: session.sentences.map((sentence) => sentence.text),
+    });
     return LTV.createTranslationQueue({
       sentences: session.sentences,
       connection,
       engine: state.settings.translator,
+      domain,
       cacheKeyFor: (engine) =>
         LTV.cacheKey({
           session: session.id,
           lang: captions.lang,
           tl,
-          engine,
+          engine: LTV.glossary.cacheEngine(engine, state.settings, domain),
         }),
       sl,
       tl,
-      title: captions.title || document.title,
+      title,
       onProgress: (done, total) => {
         session.progress = { done, total };
       },

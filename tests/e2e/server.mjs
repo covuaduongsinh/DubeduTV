@@ -3,6 +3,7 @@
 // Mọi yêu cầu được ghi vào `requests` để kịch bản kiểm tra.
 import { createServer } from "node:http";
 import {
+  STORY,
   courseraPage,
   lessonJson3,
   lessonVtt,
@@ -41,7 +42,7 @@ function media() {
 function youtubeTimedtext(url) {
   const params = url.searchParams;
   if (!params.get("pot") || params.get("lang") === "fr") return "";
-  return lessonJson3();
+  return lessonJson3(params.get("v")?.startsWith("story") ? STORY : undefined);
 }
 
 // Drive: chỉ trả phụ đề khi có cookie đăng nhập (trang cha) hoặc yêu cầu từ

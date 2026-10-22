@@ -67,6 +67,7 @@
   LTV.createTranslationQueue = function createTranslationQueue(options) {
     const { sentences, connection, cacheKeyFor, engine, sl, tl, title } =
       options;
+    const domain = options.domain || null;
     const onProgress = options.onProgress || (() => {});
     const onWarning = options.onWarning || (() => {});
     const onError = options.onError || (() => {});
@@ -106,6 +107,7 @@
           tl,
           title,
           engine,
+          domain,
         });
         if (cancelled) return;
         const done = doneCount();

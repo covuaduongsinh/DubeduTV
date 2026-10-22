@@ -1,4 +1,5 @@
 import "../shared/defaults.js";
+import "../shared/glossary.js";
 import { initChromePack } from "../popup/chrome-pack.js";
 
 const LTV = globalThis.LTV;
@@ -51,6 +52,17 @@ function bindKeySection(config, settings) {
     });
     if (response?.ok) showResult(config.okText(response), "");
     else showResult(`Lỗi: ${response?.error || "không rõ"}`, "error");
+  });
+}
+
+// Từ điển thuật ngữ riêng (storage.sync, tối đa 2000 ký tự).
+function bindCustomTerms(settings) {
+  $("custom-terms").value = settings.customTerms;
+  $("custom-terms-save").addEventListener("click", async () => {
+    const text = $("custom-terms").value.slice(0, 2000);
+    await chrome.storage.sync.set({ customTerms: text });
+    const count = LTV.glossary.parseCustom(text).length;
+    $("custom-terms-result").textContent = `Đã lưu ${count} thuật ngữ.`;
   });
 }
 
@@ -107,6 +119,7 @@ async function init() {
     },
     settings,
   );
+  bindCustomTerms(settings);
   $("clear-cache").addEventListener("click", async () => {
     await chrome.runtime.sendMessage({ type: "ltv:cacheClear" });
     refreshStats();

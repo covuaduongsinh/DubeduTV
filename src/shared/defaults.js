@@ -30,6 +30,10 @@
     // Nút "Dịch" câu hỏi trắc nghiệm (Coursera/Udemy) và huy hiệu "Đã lồng".
     quizTranslate: true,
     showBadges: true,
+    // Thuật ngữ: "auto" (tự nhận video cờ vua) | "chess" | "off"; từ điển riêng
+    // dạng "english = tiếng Việt | cách dịch sai" mỗi dòng.
+    glossaryMode: "auto",
+    customTerms: "",
   });
 
   // Ngôn ngữ nói trong video (mã BCP-47 cho bộ nhận dạng giọng nói).
@@ -62,6 +66,7 @@
 
   const ENUMS = {
     autoStart: ["off", "cached", "always"],
+    glossaryMode: ["auto", "chess", "off"],
     translator: ["google", "claude", "chrome"],
     voiceEngine: ["google", "system"],
     subtitleMode: ["translated", "bilingual", "original", "off"],
@@ -101,9 +106,15 @@
       typeof value === "boolean" ? (value ? "always" : "off") : value,
   };
 
+  const MAX_TEXT = { customTerms: 2000 };
+
   function validValue(key, stored) {
     const fallback = LTV.DEFAULTS[key];
-    const value = LEGACY[key] ? LEGACY[key](stored) : stored;
+    const raw = LEGACY[key] ? LEGACY[key](stored) : stored;
+    const value =
+      typeof raw === "string" && MAX_TEXT[key]
+        ? raw.slice(0, MAX_TEXT[key])
+        : raw;
     if (typeof value !== typeof fallback) return fallback;
     if (typeof value === "number") {
       const range = NUMBER_RANGES[key];

@@ -46,6 +46,10 @@ async function readSettings() {
 
 const translate = createTranslateRouter({
   google: translateGoogle,
+  glossarySettings: async () => {
+    const { glossaryMode, customTerms } = await readSettings();
+    return { mode: glossaryMode, custom: customTerms };
+  },
   engines: {
     claude: async (request) => {
       const { claudeApiKey } = await chrome.storage.local.get("claudeApiKey");

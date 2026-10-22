@@ -35,10 +35,17 @@ export function lessonVtt() {
   return `WEBVTT\n\n${cues.join("\n\n")}\n`;
 }
 
+// Truyện trung cổ có "knight" nhưng không phải cờ vua (từ điển không được sửa).
+export const STORY = [
+  [0.5, 3.0, "The old knight rode slowly to the village."],
+  [3.2, 6.0, "He was tired after the long journey."],
+  [6.3, 9.5, "The people welcomed him with warm bread."],
+];
+
 // json3 kiểu phụ đề tự động: mỗi sự kiện là một dòng, có thời gian từng từ.
-export function lessonJson3() {
+export function lessonJson3(lines = LESSON) {
   const events = [{ tStartMs: 0, dDurationMs: 30000, id: 1, wpWinPosId: 1 }];
-  for (const [start, end, text] of LESSON) {
+  for (const [start, end, text] of lines) {
     const words = text.split(" ");
     const step = ((end - start) * 1000 * 0.8) / words.length;
     events.push({

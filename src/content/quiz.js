@@ -42,6 +42,10 @@
 
   // Dịch các dòng theo lô bằng bộ dịch đang chọn.
   async function translateTexts(connection, settings, texts) {
+    const domain = LTV.glossary.domainFor(settings, {
+      title: document.title,
+      texts,
+    });
     const results = [];
     for (const batch of batches(texts)) {
       const response = await connection.request({
@@ -52,6 +56,7 @@
         tl: settings.targetLang,
         title: document.title,
         engine: settings.translator,
+        domain,
       });
       if (response.error && !response.results?.some(Boolean))
         throw new Error(response.error);

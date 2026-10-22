@@ -73,6 +73,7 @@
       "exclude_matches": ["https://www.youtube.com/embed/*"],
       "js": [
         "shared/defaults.js",
+        "shared/glossary.js",
         "content/lib/util.js",
         "content/lib/captions-parse.js",
         "content/lib/segment.js",
@@ -133,6 +134,7 @@
       "all_frames": true,
       "js": [
         "shared/defaults.js",
+        "shared/glossary.js",
         "content/lib/util.js",
         "content/lib/captions-parse.js",
         "content/lib/segment.js",

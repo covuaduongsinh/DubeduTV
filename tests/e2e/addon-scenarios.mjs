@@ -44,6 +44,11 @@ async function quizScenario(context, { baseUrl }) {
       lines.every((line) => VIETNAMESE.test(line)),
       "bản dịch không phải tiếng Việt",
     );
+    check(
+      lines.some((line) => /(^|\s)Mã(\s|$|[.,?!])/.test(line)) &&
+        lines.some((line) => /(^|\s)Tượng(\s|$|[.,?!])/.test(line)),
+      "quiz cờ vua không dùng thuật ngữ Mã/Tượng",
+    );
     await page.click('[data-ltv="quiz-btn"]');
     const hidden = await page.$$eval('[data-ltv="quiz-tr"]', (nodes) =>
       nodes.every((node) => node.hidden),
@@ -179,8 +184,47 @@ async function chromeTranslatorScenario(context, { baseUrl, worker }) {
   };
 }
 
+async function spokenLines(context, url, count) {
+  const page = await openPlaying(context, url);
+  let log = [];
+  for (let i = 0; i < 160; i += 1) {
+    log = await readLog(page);
+    if (log.filter((entry) => entry.done).length >= count) break;
+    await page.waitForTimeout(250);
+  }
+  await page.close();
+  return log.map((entry) => entry.text);
+}
+
+// Video cờ vua: Google dịch "knight" thành "hiệp sĩ", từ điển sửa thành Mã;
+// truyện có "knight" nhưng không về cờ vua thì giữ nguyên.
+async function glossaryScenario(context, { baseUrl }) {
+  const { failures, check } = checker();
+  const chess = await spokenLines(context, `${baseUrl}/watch?v=glossary01`, 5);
+  check(
+    chess.some((line) => /(^|\s)Mã(\s|$)/.test(line)),
+    "video cờ vua không đọc thuật ngữ Mã",
+  );
+  check(
+    !chess.some((line) => /hiệp sĩ|mảnh/i.test(line)),
+    "video cờ vua còn “hiệp sĩ”/“mảnh”",
+  );
+  const story = await spokenLines(context, `${baseUrl}/watch?v=story01`, 3);
+  check(story.length >= 3, `truyện chỉ đọc ${story.length}/3 câu`);
+  check(
+    !story.some((line) => /(^|\s)Mã(\s|$)/.test(line)),
+    "truyện không phải cờ vua bị đổi sang thuật ngữ cờ",
+  );
+  return {
+    name: "Từ điển thuật ngữ cờ vua (tự nhận video cờ vua)",
+    failures,
+    spoken: [...chess, "—", ...story],
+  };
+}
+
 export function addonScenarios(context, options) {
   return [
+    () => glossaryScenario(context, options),
     () => quizScenario(context, options),
     () => badgesScenario(context, options),
     () => cachedAutoStartScenario(context, options),

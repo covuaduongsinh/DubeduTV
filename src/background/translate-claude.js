@@ -53,27 +53,36 @@ export function languageName(code) {
   return LANGUAGE_NAMES[code] || code;
 }
 
-export function buildSystemPrompt(sl, tl) {
+// terms: thuật ngữ bắt buộc dạng "knight → Mã" (từ điển cờ vua / riêng).
+export function buildSystemPrompt(sl, tl, terms = []) {
   const target = languageName(tl);
-  const vietnameseHint =
-    tl === "vi"
-      ? " For chess videos, for example, use Mã for knight, Tượng for bishop, Xe for rook, Hậu for queen, Vua for king, Tốt for pawn and nhập thành for castling."
+  const glossary =
+    terms.length > 0
+      ? ` Always use these ${target} terms: ${terms.join("; ")}.`
       : "";
   return [
     `You translate video subtitles from ${languageName(sl)} into ${target} for a voice-over that is read aloud in sync with the video.`,
     "The user message is JSON: `lines` holds the subtitle lines to translate, in playback order, each with an `id`; `video_title` and `context_before` (earlier lines) are context only and must not be translated.",
     "Return exactly one translation for every id. Never merge, split, drop, reorder or add lines, even when a line is only a fragment of a longer sentence: translate the fragment so the sequence still reads naturally when spoken line by line.",
     `Write natural spoken ${target}, the way a professional dubbing artist would say it, rather than a word-for-word rendering. Keep each line about as long as the original so it fits the same time slot.`,
-    `Keep personal names, code, numbers and units as they are. Use the established ${target} terms of the video's field.${vietnameseHint}`,
+    `Keep personal names, code, numbers and units as they are. Use the established ${target} terms of the video's field.${glossary}`,
     `If a line is already in ${target}, or is only a name or a sound, return it unchanged.`,
   ].join("\n\n");
 }
 
-export function buildClaudeRequest({ texts, sl, tl, title, model, context }) {
+export function buildClaudeRequest({
+  texts,
+  sl,
+  tl,
+  title,
+  model,
+  context,
+  terms,
+}) {
   const body = {
     model,
     max_tokens: 16000,
-    system: buildSystemPrompt(sl || "auto", tl),
+    system: buildSystemPrompt(sl || "auto", tl, terms),
     messages: [
       {
         role: "user",
@@ -214,6 +223,7 @@ export async function translateClaude({
   apiKey,
   model,
   context = [],
+  terms = [],
   fetchImpl = fetch,
   retryDelay,
 }) {
@@ -229,6 +239,7 @@ export async function translateClaude({
       title,
       model,
       context: before,
+      terms,
       apiKey,
       fetchImpl,
       retryDelay,

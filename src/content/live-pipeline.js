@@ -11,7 +11,7 @@
 
   // Dịch một câu vừa chép, kèm vài câu trước làm ngữ cảnh.
   LTV.translateLive = async function translateLive(
-    { connection, settings, lang, title, recent },
+    { connection, settings, lang, title, recent, domain = null },
     text,
   ) {
     const tl = settings.targetLang;
@@ -24,6 +24,7 @@
       tl,
       title,
       engine: settings.translator,
+      domain,
     });
     return { text: response.results?.[0] || null, warning: response.warning };
   };
@@ -61,14 +62,24 @@
     const isStopped = options.isStopped || (() => false);
     const recent = [];
     let chain = Promise.resolve();
+    // Đã nhận ra lĩnh vực (vd. cờ vua) thì giữ cho cả phiên.
+    let domain = null;
 
     async function deliver(sentence) {
+      const settings = getSettings();
+      domain =
+        domain ||
+        LTV.glossary.domainFor(settings, {
+          title,
+          texts: [...recent, sentence.text],
+        });
       const context = {
         connection,
-        settings: getSettings(),
+        settings,
         lang: getLang(),
         title,
         recent,
+        domain,
       };
       const result = await LTV.translateLive(context, sentence.text);
       recent.push(sentence.text);

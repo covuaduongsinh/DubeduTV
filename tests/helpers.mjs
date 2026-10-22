@@ -1,5 +1,6 @@
 // Nạp các script dạng globalThis.LTV theo đúng thứ tự như manifest.
 import "../src/shared/defaults.js";
+import "../src/shared/glossary.js";
 import "../src/shared/tts-split.js";
 import "../src/content/lib/util.js";
 import "../src/content/lib/captions-parse.js";
