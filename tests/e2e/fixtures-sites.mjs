@@ -20,15 +20,15 @@ export function embedHostPage(frameOrigin) {
 // Google Drive: trang xem tệp nhúng khung trình phát (nguồn khác). variant
 // "list": trang cha tự tải danh sách phụ đề (cần cookie đăng nhập); "cc":
 // không có, phải bật phụ đề trên trình phát.
-export function driveHostPage({ frameOrigin, hostOrigin, variant }) {
+export function driveHostPage({ frameOrigin, hostOrigin, fileId, variant }) {
   const ttsurl = encodeURIComponent(
-    `${hostOrigin}/timedtext?id=FILE1&vid=abc123&hl=en`,
+    `${hostOrigin}/timedtext?id=${fileId}&vid=abc123&hl=en`,
   );
   const frameQuery =
-    variant === "list" ? `docid=FILE1&ttsurl=${ttsurl}` : "docid=FILE1";
+    variant === "list" ? `docid=${fileId}&ttsurl=${ttsurl}` : `docid=${fileId}`;
   const script =
     variant === "list"
-      ? `fetch("/timedtext?id=FILE1&vid=abc123&type=list").catch(() => {});`
+      ? `fetch("/timedtext?id=${fileId}&vid=abc123&type=list").catch(() => {});`
       : "";
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="ltv-test-drive-host" content="1">
 <title>Bai giang ma.mp4 - Google Drive</title></head><body style="margin:0;background:#202124">

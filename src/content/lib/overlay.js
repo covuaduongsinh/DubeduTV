@@ -31,6 +31,36 @@
     return Math.max(13, Math.round(base * scale));
   }
 
+  function buildShadow(host) {
+    const shadow = host.attachShadow({ mode: "open" });
+    shadow.innerHTML = `<style>${STYLE}</style>
+      <div class="wrap">
+        <div class="box" hidden><div class="line main"></div><div class="line orig" hidden></div></div>
+        <div class="status" hidden></div>
+        <button class="pill" type="button" title="Lồng tiếng Việt (Alt+Shift+D)" hidden>🔊 VI</button>
+      </div>`;
+    const part = (selector) => shadow.querySelector(selector);
+    return {
+      box: part(".box"),
+      main: part(".main"),
+      orig: part(".orig"),
+      status: part(".status"),
+      pill: part(".pill"),
+    };
+  }
+
+  function renderLine({ box, main, orig }, mode, sentence) {
+    const translated = sentence?.tr || "";
+    const original = sentence?.text || "";
+    const mainText = mode === "original" ? original : translated;
+    const showOriginal =
+      mode === "bilingual" && original && original !== translated;
+    main.textContent = mainText;
+    orig.textContent = showOriginal ? original : "";
+    orig.hidden = !showOriginal;
+    box.hidden = mode === "off" || !mainText;
+  }
+
   // Khung phủ theo phần tử neo (đủ lớn) hoặc cả cửa sổ.
   function anchorRect(anchor) {
     const rect = anchor?.()?.getBoundingClientRect();
@@ -46,18 +76,7 @@
     host.style.cssText = fixed
       ? "position:fixed;pointer-events:none;z-index:2147483646;"
       : "position:absolute;pointer-events:none;z-index:60;inset:auto;";
-    const shadow = host.attachShadow({ mode: "open" });
-    shadow.innerHTML = `<style>${STYLE}</style>
-      <div class="wrap">
-        <div class="box" hidden><div class="line main"></div><div class="line orig" hidden></div></div>
-        <div class="status" hidden></div>
-        <button class="pill" type="button" title="Lồng tiếng Việt (Alt+Shift+D)" hidden>🔊 VI</button>
-      </div>`;
-    const box = shadow.querySelector(".box");
-    const main = shadow.querySelector(".main");
-    const orig = shadow.querySelector(".orig");
-    const status = shadow.querySelector(".status");
-    const pill = shadow.querySelector(".pill");
+    const { box, main, orig, status, pill } = buildShadow(host);
     let statusTimer = null;
     let lastSentence = null;
 
@@ -94,18 +113,8 @@
       box.style.fontSize = `${fontSize(getSettings().subtitleSize, width)}px`;
     }
 
-    function render(sentence) {
-      const mode = getSettings().subtitleMode;
-      const translated = sentence?.tr || "";
-      const original = sentence?.text || "";
-      const mainText = mode === "original" ? original : translated;
-      const showOriginal =
-        mode === "bilingual" && original && original !== translated;
-      main.textContent = mainText;
-      orig.textContent = showOriginal ? original : "";
-      orig.hidden = !showOriginal;
-      box.hidden = mode === "off" || !mainText;
-    }
+    const render = (sentence) =>
+      renderLine({ box, main, orig }, getSettings().subtitleMode, sentence);
 
     const resizeObserver = new ResizeObserver(position);
     if (video) resizeObserver.observe(video);

@@ -7,7 +7,7 @@
   const LTV = (root.LTV = root.LTV || {});
   LTV.providers = LTV.providers || [];
 
-  const SIGNED_WAIT_MS = 1500;
+  const SIGNED_WAIT_MS = 300;
   const AD_WAIT_MS = 60000;
 
   function videoKey(loc) {

@@ -15,6 +15,7 @@ import {
   whisperErrorScenario,
 } from "./live-scenarios.mjs";
 import { waitForStatus } from "./page-helpers.mjs";
+import { frameScenarios } from "./frame-scenarios.mjs";
 import { startServer } from "./server.mjs";
 import {
   runSite,
@@ -115,6 +116,57 @@ async function optionsPage(context) {
 
 let baseUrl = "";
 
+// Các nhóm kịch bản theo thứ tự chạy (nhóm sau dùng cache/lời chép của nhóm
+// trước). LTV_E2E_GROUPS="base,frames" để chạy một phần.
+function selectScenarios(context, worker) {
+  const groups = {
+    base: [
+      () =>
+        runSite(context, {
+          name: "YouTube (giả lập, timedtext cần PO token)",
+          path: `${baseUrl}/watch?v=knight01`,
+          extraChecks: youtubeChecks,
+        }),
+      () =>
+        runSite(context, {
+          name: "Udemy (giả lập, API bài giảng + VTT khác origin)",
+          path: `${baseUrl}/udemy/course/demo/learn/lecture/4242`,
+          extraChecks: udemyChecks(),
+        }),
+      () =>
+        runSite(context, {
+          name: "Coursera (giả lập, thẻ <track>)",
+          path: `${baseUrl}/coursera/learn/demo/lecture/abc123`,
+        }),
+      () => realSpeechPath(context),
+      () =>
+        liveScenario(context, {
+          baseUrl,
+          worker,
+          videoId: "nosub01",
+          liveMode: "consecutive",
+        }),
+      () =>
+        liveScenario(context, {
+          baseUrl,
+          worker,
+          videoId: "nosub02",
+          liveMode: "parallel",
+        }),
+      () => replayScenario(context, { baseUrl, videoId: "nosub01" }),
+      () => whisperErrorScenario(context, { baseUrl, worker }),
+      () => chromeAsrErrorScenario(context, { baseUrl }),
+      () => optionsPage(context),
+    ],
+    youtube: youtubeVariants(context, baseUrl),
+    frames: frameScenarios(context, { baseUrl, worker }),
+  };
+  const wanted = (process.env.LTV_E2E_GROUPS || Object.keys(groups).join(","))
+    .split(",")
+    .map((name) => name.trim());
+  return wanted.flatMap((name) => groups[name] || []);
+}
+
 async function main() {
   execFileSync(
     process.execPath,
@@ -129,40 +181,7 @@ async function main() {
     await worker.evaluate(() =>
       chrome.storage.sync.set({ autoStart: true, voiceEngine: "google" }),
     );
-    results.push(
-      await runSite(context, {
-        name: "YouTube (giả lập, timedtext cần PO token)",
-        path: `${baseUrl}/watch?v=knight01`,
-        extraChecks: youtubeChecks,
-      }),
-      await runSite(context, {
-        name: "Udemy (giả lập, API bài giảng + VTT khác origin)",
-        path: `${baseUrl}/udemy/course/demo/learn/lecture/4242`,
-        extraChecks: udemyChecks(),
-      }),
-      await runSite(context, {
-        name: "Coursera (giả lập, thẻ <track>)",
-        path: `${baseUrl}/coursera/learn/demo/lecture/abc123`,
-      }),
-      await realSpeechPath(context),
-      await liveScenario(context, {
-        baseUrl,
-        worker,
-        videoId: "nosub01",
-        liveMode: "consecutive",
-      }),
-      await liveScenario(context, {
-        baseUrl,
-        worker,
-        videoId: "nosub02",
-        liveMode: "parallel",
-      }),
-      await replayScenario(context, { baseUrl, videoId: "nosub01" }),
-      await whisperErrorScenario(context, { baseUrl, worker }),
-      await chromeAsrErrorScenario(context, { baseUrl }),
-      await optionsPage(context),
-    );
-    for (const scenario of youtubeVariants(context, baseUrl))
+    for (const scenario of selectScenarios(context, worker))
       results.push(await scenario());
   } finally {
     await context.close();

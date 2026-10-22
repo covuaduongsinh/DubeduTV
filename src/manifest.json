@@ -31,6 +31,7 @@
     "https://*.udemy.com/*",
     "https://*.udemycdn.com/*",
     "https://*.coursera.org/*",
+    "https://video.twimg.com/*",
     "https://translate.googleapis.com/*",
     "https://translate.google.com/*",
     "https://api.anthropic.com/*",
@@ -43,19 +44,26 @@
         "https://www.youtube.com/*",
         "https://m.youtube.com/*",
         "https://*.udemy.com/*",
-        "https://*.coursera.org/*"
+        "https://*.coursera.org/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
       ],
+      "exclude_matches": ["https://www.youtube.com/embed/*"],
       "js": ["content/page-hook.js"],
-      "world": "MAIN",
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "world": "MAIN"
     },
     {
       "matches": [
         "https://www.youtube.com/*",
         "https://m.youtube.com/*",
         "https://*.udemy.com/*",
-        "https://*.coursera.org/*"
+        "https://*.coursera.org/*",
+        "https://x.com/*",
+        "https://twitter.com/*",
+        "https://drive.google.com/file/*"
       ],
+      "exclude_matches": ["https://www.youtube.com/embed/*"],
       "js": [
         "shared/defaults.js",
         "content/lib/util.js",
@@ -71,10 +79,15 @@
         "content/lib/overlay.js",
         "content/lib/auto-start.js",
         "content/lib/yt-timedtext.js",
+        "content/lib/hls.js",
+        "content/lib/drive-timedtext.js",
+        "content/lib/drive-channel.js",
         "content/providers/html5.js",
         "content/providers/youtube.js",
         "content/providers/udemy.js",
         "content/providers/coursera.js",
+        "content/providers/drive.js",
+        "content/providers/x.js",
         "content/dubber.js",
         "content/asr/chrome-recognizer.js",
         "content/asr/whisper-recognizer.js",
@@ -82,6 +95,63 @@
         "content/live-pipeline.js",
         "content/live-session.js",
         "content/voice-fallback.js",
+        "content/sites/drive-host.js",
+        "content/addons.js",
+        "content/main.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/embed/*",
+        "https://www.youtube-nocookie.com/embed/*",
+        "https://youtube.googleapis.com/embed/*"
+      ],
+      "all_frames": true,
+      "js": ["content/page-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/embed/*",
+        "https://www.youtube-nocookie.com/embed/*",
+        "https://youtube.googleapis.com/embed/*"
+      ],
+      "all_frames": true,
+      "js": [
+        "shared/defaults.js",
+        "content/lib/util.js",
+        "content/lib/captions-parse.js",
+        "content/lib/segment.js",
+        "content/lib/timing.js",
+        "content/lib/tracks.js",
+        "content/lib/bridge.js",
+        "content/lib/connection.js",
+        "content/lib/speech-client.js",
+        "content/lib/translate-queue.js",
+        "content/lib/audio-chunker.js",
+        "content/lib/overlay.js",
+        "content/lib/auto-start.js",
+        "content/lib/yt-timedtext.js",
+        "content/lib/hls.js",
+        "content/lib/drive-timedtext.js",
+        "content/lib/drive-channel.js",
+        "content/providers/html5.js",
+        "content/providers/youtube.js",
+        "content/providers/udemy.js",
+        "content/providers/coursera.js",
+        "content/providers/drive.js",
+        "content/providers/x.js",
+        "content/dubber.js",
+        "content/asr/chrome-recognizer.js",
+        "content/asr/whisper-recognizer.js",
+        "content/live-dubber.js",
+        "content/live-pipeline.js",
+        "content/live-session.js",
+        "content/voice-fallback.js",
+        "content/sites/drive-host.js",
+        "content/addons.js",
         "content/main.js"
       ],
       "run_at": "document_idle"

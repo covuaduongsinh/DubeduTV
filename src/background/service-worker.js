@@ -1,6 +1,7 @@
 // Service worker: nhận yêu cầu từ content script qua port "ltv" (dịch, đọc,
 // cache, tải phụ đề chéo nguồn) và từ popup/options/offscreen qua message.
 import "../shared/defaults.js";
+import "../shared/frame-probe.js";
 import { translateGoogle } from "./translate-google.js";
 import { translateClaude } from "./translate-claude.js";
 import { createSpeech } from "./tts.js";
@@ -21,6 +22,7 @@ const ports = new Map();
 const cache = createCache({ storage: chrome.storage.local });
 const transcripts = createTranscriptStore({ storage: chrome.storage.local });
 const library = createLibrary({ cache, transcripts });
+const frameProbe = LTV.createFrameProbe();
 const isFetchAllowed = createFetchGuard(chrome.runtime.getManifest());
 
 function safePost(port, message) {
@@ -300,9 +302,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+// Phím tắt: bật/tắt ở khung có video (trang chính hoặc video nhúng).
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "toggle-dubbing") return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab?.id !== undefined)
-    chrome.tabs.sendMessage(tab.id, { type: "ltv:toggle" }).catch(() => {});
+  if (tab?.id === undefined) return;
+  const frameId = LTV.chooseFrame(await frameProbe.probe(tab.id));
+  if (frameId === null) return;
+  chrome.tabs
+    .sendMessage(tab.id, { type: "ltv:toggle" }, { frameId })
+    .catch(() => {});
 });

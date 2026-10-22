@@ -6,13 +6,15 @@
   LTV.providers = LTV.providers || [];
 
   // noCaptions: video không có phụ đề dùng được → có thể chuyển sang tự chép lời.
+  // captureBlocked: trang chặn thu âm video → gợi ý "Nghe âm thanh cả thẻ".
   LTV.captionError = function captionError(
     message,
-    { noCaptions = false } = {},
+    { noCaptions = false, captureBlocked = false } = {},
   ) {
     const error = new Error(message);
     error.userMessage = message;
     error.noCaptions = noCaptions;
+    error.captureBlocked = captureBlocked;
     return error;
   };
 

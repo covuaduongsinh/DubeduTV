@@ -89,6 +89,7 @@ function route(url, request, origins) {
       driveHostPage({
         frameOrigin: origins.frame,
         hostOrigin: origins.host,
+        fileId: pathname.split("/")[4],
         variant: url.searchParams.get("variant") || "list",
       }),
       { "set-cookie": "drive_auth=1; Path=/; SameSite=Lax" },

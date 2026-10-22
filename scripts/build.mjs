@@ -80,21 +80,26 @@ function createZip(files, baseDir, prefix) {
   return Buffer.concat([...locals, ...centrals, end]);
 }
 
+// Bản kiểm thử: trang chính giả lập chạy trên 127.0.0.1; khung nhúng và CDN
+// khác nguồn chạy trên localhost (như udemycdn, khung trình phát YouTube/Drive).
 function patchForTests(manifest) {
   manifest.name = `${manifest.name} (test)`;
-  // localhost đóng vai CDN khác origin (như udemycdn) để thử đường tải qua service worker.
   manifest.host_permissions.push(TEST_ORIGIN, "http://localhost/*");
   for (const script of manifest.content_scripts) {
-    script.matches.push(TEST_ORIGIN);
-    if (script.world !== "MAIN") {
-      script.js.splice(
-        script.js.indexOf("content/main.js"),
-        0,
-        "test/test-overrides.js",
-      );
-    }
+    script.matches.push(script.all_frames ? "http://localhost/*" : TEST_ORIGIN);
+    const main = script.js.indexOf("content/main.js");
+    if (main >= 0) script.js.splice(main, 0, "test/test-overrides.js");
   }
   return manifest;
+}
+
+// Bộ script của trang chính và của khung nhúng phải giống nhau.
+function checkBundles(manifest) {
+  const bundles = manifest.content_scripts
+    .filter((script) => script.js.includes("content/main.js"))
+    .map((script) => script.js.join("|"));
+  if (new Set(bundles).size > 1)
+    throw new Error("manifest: các bộ content script không giống nhau");
 }
 
 function build() {
@@ -106,6 +111,7 @@ function build() {
     writeFileSync(join(outDir, "icons", `icon${size}.png`), drawIcon(size));
   const manifestPath = join(outDir, "manifest.json");
   let manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  checkBundles(manifest);
   if (isTest) {
     mkdirSync(join(outDir, "test"), { recursive: true });
     cpSync(

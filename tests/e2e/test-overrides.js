@@ -6,6 +6,16 @@
   const LTV = globalThis.LTV;
   LTV.testMode = true;
 
+  // Trang giả lập: Drive chạy trên 127.0.0.1, khung trình phát trên localhost;
+  // máy chủ media của X là localhost.
+  LTV.DRIVE_ORIGINS = {
+    parent: /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+    child: /^http:\/\/localhost(:\d+)?$/,
+  };
+  LTV.driveHost.matches = () =>
+    Boolean(document.querySelector('meta[name="ltv-test-drive-host"]'));
+  LTV.X_MEDIA_HOST = /^(video\.twimg\.com|localhost)$/;
+
   LTV.pickProvider = function pickProvider(loc) {
     const id = document.querySelector(
       'meta[name="ltv-test-provider"]',

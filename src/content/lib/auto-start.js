@@ -2,24 +2,27 @@
 // và quyết định tự bật khi mở video theo cài đặt autoStart:
 //   "off" – không tự bật; "always" – mọi video;
 //   "cached" – chỉ video đã có bản dịch hoặc lời chép lưu trên máy.
-// Trong khung video nhúng chỉ tự bật khi video bắt đầu phát, để trang có
+// Trong khung video nhúng chỉ tự bật khi video phát có tiếng, để trang có
 // nhiều video nhúng tự chạy (tắt tiếng) không bị dịch hết.
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
   const ACTIVE_KEY = "ltv-active";
 
-  function waitForPlaying(video, signal) {
-    if (!video.paused && video.currentTime > 0) return Promise.resolve(true);
+  // Chờ video phát có tiếng (video nhúng tự chạy tắt tiếng thì chưa tính).
+  function waitForAudible(video, signal) {
+    const audible = () => !video.paused && !video.muted;
+    if (audible()) return Promise.resolve(true);
     return new Promise((resolve) => {
+      const events = ["playing", "volumechange"];
       const finish = (value) => {
-        video.removeEventListener("playing", onPlaying);
+        for (const name of events) video.removeEventListener(name, check);
         signal?.removeEventListener("abort", onAbort);
         resolve(value);
       };
-      const onPlaying = () => finish(true);
+      const check = () => audible() && finish(true);
       const onAbort = () => finish(false);
-      video.addEventListener("playing", onPlaying);
+      for (const name of events) video.addEventListener(name, check);
       signal?.addEventListener("abort", onAbort);
     });
   }
@@ -71,7 +74,7 @@
         if (mode === "off") return false;
         if (mode === "cached" && !(await known(sessionId))) return false;
         if (signal?.aborted) return false;
-        return isTop ? true : waitForPlaying(video, signal);
+        return isTop ? true : waitForAudible(video, signal);
       },
     };
   };

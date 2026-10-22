@@ -1,4 +1,5 @@
 import "../shared/defaults.js";
+import "../shared/frame-probe.js";
 import { initChromePack } from "./chrome-pack.js";
 
 const LTV = globalThis.LTV;
@@ -9,9 +10,15 @@ const PREVIEW_TEXT = {
   en: "Hello! This is the dubbing voice for your video.",
 };
 
+const PROBE_EVERY_MS = 3000;
+
 let settings = LTV.mergeSettings({});
 let tab = null;
 let lastStatus = null;
+// Khung đang điều khiển (trang chính hoặc video nhúng), chọn lại định kỳ.
+const frameProbe = LTV.createFrameProbe();
+let frameId = null;
+let probedAt = 0;
 const chromePack = initChromePack({
   getSettings: () => settings,
   // Ngôn ngữ gốc: cài đặt, hoặc ngôn ngữ phụ đề của video đang mở.
@@ -191,7 +198,7 @@ function renderStatus(status) {
   if (!status) {
     const injectable = /^https?:/.test(tab?.url || "");
     text.textContent = injectable
-      ? "Trang này chưa được hỗ trợ sẵn (hỗ trợ: YouTube, Udemy, Coursera)."
+      ? "Trang này chưa được hỗ trợ sẵn (hỗ trợ: YouTube, Udemy, Coursera, Google Drive, X và video YouTube nhúng)."
       : "Không lồng tiếng được trên trang này.";
     text.className = "status-text muted";
     toggle.hidden = true;
@@ -220,12 +227,24 @@ function renderStatus(status) {
       `${Math.round((100 * progress.done) / progress.total)}%`;
 }
 
+async function sendToFrame(message) {
+  if (frameId === null || Date.now() - probedAt > PROBE_EVERY_MS) {
+    frameId = LTV.chooseFrame(await frameProbe.probe(tab.id));
+    probedAt = Date.now();
+  }
+  if (frameId === null) throw new Error("no-frame");
+  try {
+    return await chrome.tabs.sendMessage(tab.id, message, { frameId });
+  } catch (error) {
+    frameId = null;
+    throw error;
+  }
+}
+
 async function refreshStatus() {
   if (tab?.id === undefined) return renderStatus(null);
   try {
-    renderStatus(
-      await chrome.tabs.sendMessage(tab.id, { type: "ltv:getStatus" }),
-    );
+    renderStatus(await sendToFrame({ type: "ltv:getStatus" }));
   } catch {
     renderStatus(null);
   }
@@ -234,9 +253,7 @@ async function refreshStatus() {
 function bindActions() {
   $("toggle").addEventListener("click", async () => {
     try {
-      renderStatus(
-        await chrome.tabs.sendMessage(tab.id, { type: "ltv:toggle" }),
-      );
+      renderStatus(await sendToFrame({ type: "ltv:toggle" }));
     } catch {
       renderStatus(null);
     }
@@ -269,7 +286,11 @@ function bindActions() {
 
 async function init() {
   settings = LTV.mergeSettings(await chrome.storage.sync.get(null));
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // ?tabId=: mở popup như một trang để kiểm thử với thẻ chỉ định.
+  const tabId = Number(new URL(location.href).searchParams.get("tabId"));
+  [tab] = tabId
+    ? [await chrome.tabs.get(tabId)]
+    : await chrome.tabs.query({ active: true, currentWindow: true });
   fillLanguageSelects();
   renderSettings();
   bindSettings();

@@ -82,6 +82,7 @@
       ui.button?.destroy();
       ui.button = LTV.createPlayerButton(bar, () => toggle());
     }
+    ui.overlay.setPill(!bar && !ui.button?.isAttached());
     const on = isOn(state.session?.id);
     ui.overlay.setActive(on);
     ui.button?.setActive(on);
@@ -129,7 +130,7 @@
       engine: state.settings.translator,
       cacheKeyFor: (engine) =>
         LTV.cacheKey({
-          session: captions.cacheId || session.id,
+          session: session.id,
           lang: captions.lang,
           tl,
           engine,
@@ -366,6 +367,33 @@
     };
   }
 
+  // Thông tin để popup/phím tắt chọn khung có video (trang chính hoặc nhúng).
+  function frameInfo() {
+    const snapshot = statusSnapshot();
+    const rect = state.ui.video?.isConnected
+      ? state.ui.video.getBoundingClientRect()
+      : null;
+    return {
+      top: isTop,
+      provider: snapshot.provider,
+      onVideo: snapshot.onVideo,
+      active: snapshot.active && Boolean(state.session),
+      area: rect ? Math.round(rect.width * rect.height) : 0,
+    };
+  }
+
+  // Tạm dừng phiên trong khung này (đang nghe âm thanh cả thẻ) mà không ghi
+  // nhớ là người dùng đã tắt.
+  function pause() {
+    state.active = false;
+    state.autoFor = null;
+    state.autoPending?.controller.abort();
+    state.autoPending = null;
+    stopSession();
+    state.ui.overlay?.setActive(false);
+    state.ui.button?.setActive(false);
+  }
+
   function onRuntimeMessage(message, sender, sendResponse) {
     if (message?.type === "ltv:toggle") {
       if (message.force) state.forced = true;
@@ -373,6 +401,18 @@
       sendResponse(statusSnapshot());
     } else if (message?.type === "ltv:getStatus") {
       sendResponse(statusSnapshot());
+    } else if (message?.type === "ltv:probe") {
+      chrome.runtime
+        .sendMessage({
+          type: "ltv:frameInfo",
+          nonce: message.nonce,
+          info: frameInfo(),
+        })
+        .catch(() => {});
+    } else if (message?.type === "ltv:ping") {
+      sendResponse({ ok: true, top: isTop });
+    } else if (message?.type === "ltv:pause") {
+      pause();
     }
     return false;
   }
@@ -434,6 +474,12 @@
     chrome.runtime.onMessage.addListener(onRuntimeMessage);
     watchNavigation();
     evaluate();
+    LTV.startAddons({
+      connection,
+      getSettings,
+      siteId: pickProvider()?.id || null,
+      isTop,
+    });
   }
 
   init();
