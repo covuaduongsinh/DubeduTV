@@ -3,101 +3,28 @@
 // kiểm tra: lấy phụ đề → dịch thật qua Google → đọc đúng thứ tự/thời điểm →
 // giảm rồi trả âm lượng → phụ đề trên video. Cần mạng tới translate.googleapis.com.
 import { execFileSync } from "node:child_process";
-import { createServer } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import {
-  LESSON,
-  courseraPage,
-  lessonJson3,
-  lessonVtt,
-  silenceWav,
-  udemyPage,
-  youtubePage,
-} from "./fixtures.mjs";
-import {
   chromeAsrErrorScenario,
   liveScenario,
   replayScenario,
   whisperErrorScenario,
 } from "./live-scenarios.mjs";
+import { waitForStatus } from "./page-helpers.mjs";
+import { startServer } from "./server.mjs";
 import {
-  VIETNAMESE,
-  overlayText,
-  readLog,
-  waitForStatus,
-} from "./page-helpers.mjs";
+  runSite,
+  udemyChecks,
+  youtubeChecks,
+  youtubeVariants,
+} from "./site-scenarios.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const extensionDir = join(root, "dist", "long-tieng-viet-test");
-const requests = [];
-
-function startServer() {
-  const wav = silenceWav();
-  const shortWav = silenceWav(19);
-  const toneWav = silenceWav(20, 8000, true);
-  const server = createServer((request, response) => {
-    const url = new URL(request.url, "http://127.0.0.1");
-    requests.push(url.pathname + url.search);
-    const send = (status, type, body) => {
-      response.writeHead(status, {
-        "content-type": type,
-        "cache-control": "no-store",
-      });
-      response.end(body);
-    };
-    const port = server.address().port;
-    if (url.pathname === "/watch") return send(200, "text/html", youtubePage());
-    if (url.pathname.startsWith("/udemy/"))
-      return send(200, "text/html", udemyPage(`http://localhost:${port}`));
-    if (url.pathname.startsWith("/coursera/"))
-      return send(200, "text/html", courseraPage());
-    if (url.pathname === "/media/silence.wav")
-      return send(200, "audio/wav", wav);
-    if (url.pathname === "/media/short.wav")
-      return send(200, "audio/wav", shortWav);
-    if (url.pathname === "/media/tone.wav")
-      return send(200, "audio/wav", toneWav);
-    if (url.pathname === "/api/timedtext") {
-      // Giống YouTube hiện nay: thiếu PO token thì trả rỗng.
-      return send(
-        200,
-        "application/json",
-        url.searchParams.get("pot") ? lessonJson3() : "",
-      );
-    }
-    if (
-      url.pathname.startsWith(
-        "/api-2.0/users/me/subscribed-courses/77/lectures/4242/",
-      )
-    ) {
-      const captions = [
-        {
-          url: `http://localhost:${port}/cdn/udemy-en.vtt`,
-          locale_id: "en_US",
-          source: "manual",
-          video_label: "English",
-        },
-      ];
-      return send(
-        200,
-        "application/json",
-        JSON.stringify({ _class: "lecture", asset: { captions } }),
-      );
-    }
-    if (
-      url.pathname === "/cdn/udemy-en.vtt" ||
-      url.pathname === "/subs/coursera-en.vtt"
-    ) {
-      return send(200, "text/vtt", lessonVtt());
-    }
-    return send(404, "text/plain", "not found");
-  });
-  return new Promise((resolve) => server.listen(0, () => resolve(server)));
-}
 
 async function launch() {
   const userDataDir = mkdtempSync(join(tmpdir(), "ltv-e2e-"));
@@ -124,98 +51,6 @@ async function launch() {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return { context, worker, userDataDir };
-}
-
-async function runSite(context, { name, path, extraChecks }) {
-  const page = await context.newPage();
-  const failures = [];
-  const check = (condition, message) => {
-    if (!condition) failures.push(message);
-  };
-  const response = await page.goto(path);
-  if (process.env.LTV_E2E_DEBUG)
-    console.log(path, response?.status(), (await page.content()).slice(0, 300));
-  await page.waitForSelector("video", { state: "attached" });
-  await page.evaluate(() => document.querySelector("video").play());
-  const lines = new Set();
-  let log = [];
-  const deadline = Date.now() + 45000;
-  while (Date.now() < deadline) {
-    log = await readLog(page);
-    const text = await overlayText(page);
-    if (text) lines.add(text);
-    if (log.filter((entry) => entry.done).length >= LESSON.length) break;
-    await page.waitForTimeout(250);
-  }
-  const done = log.filter((entry) => entry.done && !entry.interrupted);
-  check(
-    done.length >= LESSON.length,
-    `chỉ đọc xong ${done.length}/${LESSON.length} câu`,
-  );
-  check(
-    done.every((entry) => VIETNAMESE.test(entry.text)),
-    "có câu đọc không phải tiếng Việt",
-  );
-  log.forEach((entry, i) => {
-    const sentence = LESSON[i];
-    if (sentence)
-      check(
-        entry.at >= sentence[0] - 0.2,
-        `câu ${i + 1} đọc sớm (${entry.at}s < ${sentence[0]}s)`,
-      );
-  });
-  check(
-    log.every((entry, i) => i === 0 || entry.at >= log[i - 1].at),
-    "thứ tự đọc không tăng dần theo thời gian",
-  );
-  const ducked = done.filter((entry) => entry.volumeDuring !== undefined);
-  check(
-    ducked.length > 0 && ducked.every((entry) => entry.volumeDuring <= 0.2),
-    "âm lượng gốc không được giảm khi đọc",
-  );
-  await page.evaluate(() => document.querySelector("video").pause());
-  await page.waitForTimeout(1200);
-  const volume = await page.evaluate(
-    () => document.querySelector("video").volume,
-  );
-  check(volume > 0.95, `âm lượng gốc không được trả lại (còn ${volume})`);
-  check(
-    [...lines].some((text) => VIETNAMESE.test(text)),
-    "phụ đề tiếng Việt không hiện trên video",
-  );
-  if (extraChecks) await extraChecks(page, check);
-  await page.close();
-  return {
-    name,
-    failures,
-    spoken: done.map(
-      (entry) => `${entry.at.toFixed(2)}s ×${entry.rate} ${entry.text}`,
-    ),
-  };
-}
-
-async function youtubeChecks(page, check) {
-  const button = await page.$('.ytp-right-controls [data-ltv="button"]');
-  check(Boolean(button), "không có nút VI trên thanh điều khiển YouTube");
-  const unloaded = await page.evaluate(
-    () => document.body.dataset.captionsUnloaded === "1",
-  );
-  check(unloaded, "không trả lại trạng thái phụ đề YouTube sau khi lấy");
-  check(
-    requests.some(
-      (r) => r.startsWith("/api/timedtext") && r.includes("pot=TOKEN"),
-    ),
-    "không bắt được timedtext có pot",
-  );
-}
-
-function udemyChecks() {
-  return async (page, check) => {
-    check(
-      requests.includes("/cdn/udemy-en.vtt"),
-      "không tải VTT Udemy qua service worker (khác origin)",
-    );
-  };
 }
 
 // Đường giọng đọc thật: service worker → offscreen → translate_tts. Ở môi trường
@@ -327,6 +162,8 @@ async function main() {
       await chromeAsrErrorScenario(context, { baseUrl }),
       await optionsPage(context),
     );
+    for (const scenario of youtubeVariants(context, baseUrl))
+      results.push(await scenario());
   } finally {
     await context.close();
     server.close();

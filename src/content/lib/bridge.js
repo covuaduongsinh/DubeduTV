@@ -1,14 +1,17 @@
 // Cầu nối giữa content script (isolated world) và page-hook.js (MAIN world):
-// nhận payload phụ đề mà trang tải về, gọi API trình phát của trang.
+// nhận payload phụ đề mà trang tải về, địa chỉ phụ đề/playlist trang đã tải
+// (resources, không có nội dung) và gọi API trình phát của trang.
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
   const FROM_CONTENT = "ltv-content";
   const FROM_PAGE = "ltv-page";
   const MAX_CAPTURES = 40;
+  const MAX_RESOURCES = 60;
 
   const pending = new Map();
   const captures = [];
+  const resources = [];
   const listeners = new Set();
   let started = false;
   let sequence = 0;
@@ -40,6 +43,13 @@
     for (const listener of listeners) listener(capture);
   }
 
+  function handleResource(data) {
+    if (typeof data.url !== "string" || typeof data.kind !== "string") return;
+    if (resources.some((item) => item.url === data.url)) return;
+    resources.push({ kind: data.kind, url: data.url, at: data.at });
+    if (resources.length > MAX_RESOURCES) resources.shift();
+  }
+
   function start() {
     if (started) return;
     started = true;
@@ -49,6 +59,7 @@
       if (!data || data.source !== FROM_PAGE) return;
       if (data.type === "reply") handleReply(data);
       else if (data.type === "capture") handleCapture(data);
+      else if (data.type === "resource") handleResource(data);
     });
     // page-hook giữ lại payload tải trước khi content script sẵn sàng.
     window.postMessage({ source: FROM_CONTENT, type: "replay" }, "*");
@@ -104,5 +115,6 @@
     onCapture,
     waitForCapture,
     captures: () => captures.slice(),
+    resources: () => resources.slice(),
   };
 })(globalThis);

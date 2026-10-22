@@ -1,7 +1,8 @@
 // Lớp phủ trên khung video (shadow DOM để không đụng CSS của trang):
 // phụ đề dịch/song ngữ, thông báo trạng thái và nút bật/tắt dạng viên thuốc
 // cho trang không có thanh điều khiển riêng. Nút trên thanh điều khiển
-// YouTube nằm ở createPlayerButton.
+// YouTube nằm ở createPlayerButton. Chế độ fixed (nghe cả thẻ) phủ theo vị
+// trí trên màn hình của một phần tử (khung video nhúng) hoặc cả cửa sổ.
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
@@ -30,18 +31,21 @@
     return Math.max(13, Math.round(base * scale));
   }
 
-  LTV.createOverlay = function createOverlay({
-    container,
-    video,
-    fill,
-    showPill,
-    getSettings,
-    onToggle,
-  }) {
+  // Khung phủ theo phần tử neo (đủ lớn) hoặc cả cửa sổ.
+  function anchorRect(anchor) {
+    const rect = anchor?.()?.getBoundingClientRect();
+    if (rect && rect.width > 80 && rect.height > 60) return rect;
+    return { left: 0, top: 0, width: innerWidth, height: innerHeight };
+  }
+
+  LTV.createOverlay = function createOverlay(options) {
+    const { container, video, fill, fixed, anchor, getSettings, onToggle } =
+      options;
     const host = document.createElement("div");
     host.setAttribute("data-ltv", "overlay");
-    host.style.cssText =
-      "position:absolute;pointer-events:none;z-index:60;inset:auto;";
+    host.style.cssText = fixed
+      ? "position:fixed;pointer-events:none;z-index:2147483646;"
+      : "position:absolute;pointer-events:none;z-index:60;inset:auto;";
     const shadow = host.attachShadow({ mode: "open" });
     shadow.innerHTML = `<style>${STYLE}</style>
       <div class="wrap">
@@ -57,13 +61,27 @@
     let statusTimer = null;
     let lastSentence = null;
 
-    pill.hidden = !showPill;
+    pill.hidden = !options.showPill;
     pill.addEventListener("click", (event) => {
       event.stopPropagation();
       onToggle();
     });
 
+    function placeFixed() {
+      const rect = anchorRect(anchor);
+      host.style.left = `${rect.left}px`;
+      host.style.top = `${rect.top}px`;
+      host.style.width = `${rect.width}px`;
+      host.style.height = `${rect.height}px`;
+      return rect.width;
+    }
+
     function position() {
+      if (fixed) {
+        const width = placeFixed();
+        box.style.fontSize = `${fontSize(getSettings().subtitleSize, width)}px`;
+        return;
+      }
       if (fill) {
         host.style.inset = "0";
       } else {
@@ -90,8 +108,20 @@
     }
 
     const resizeObserver = new ResizeObserver(position);
-    resizeObserver.observe(video);
-    if (fill) resizeObserver.observe(container);
+    if (video) resizeObserver.observe(video);
+    if (fill || fixed) resizeObserver.observe(container);
+    let frame = 0;
+    const reposition = () => {
+      if (!frame)
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          position();
+        });
+    };
+    if (fixed) {
+      addEventListener("scroll", reposition, { passive: true, capture: true });
+      addEventListener("resize", reposition);
+    }
     container.appendChild(host);
     position();
 
@@ -116,10 +146,17 @@
         pill.classList.toggle("on", active);
         pill.textContent = active ? "🔊 VI: Bật" : "🔊 VI";
       },
-      isAttached: () => host.isConnected && video.isConnected,
+      // Hiện nút viên thuốc khi trình phát không có chỗ gắn nút (Shorts…).
+      setPill(visible) {
+        pill.hidden = !visible;
+      },
+      isAttached: () => host.isConnected && (!video || video.isConnected),
       destroy() {
         clearTimeout(statusTimer);
+        cancelAnimationFrame(frame);
         resizeObserver.disconnect();
+        removeEventListener("scroll", reposition, { capture: true });
+        removeEventListener("resize", reposition);
         host.remove();
       },
     };

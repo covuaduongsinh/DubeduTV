@@ -67,48 +67,75 @@ export function silenceWav(seconds = 40, sampleRate = 8000, tone = false) {
 const PAGE_STYLE =
   "body{margin:0;background:#222;color:#eee;font-family:sans-serif}";
 
-function page(provider, title, body, script = "") {
+export function page(provider, title, body, script = "") {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="ltv-test-provider" content="${provider}">
 <title>${title}</title><style>${PAGE_STYLE}</style></head><body>${body}<script>${script}</script></body></html>`;
 }
 
-export function youtubePage() {
+// Trình phát YouTube giả. layout: "watch" | "shorts" | "mobile" | "embed"
+// (embed: không có getPlayerResponse, danh sách phụ đề lấy từ module captions).
+// ?signed=xhr|img: trình phát đã tự tải phụ đề tiếng Pháp kèm token (img: chỉ
+// thấy qua Resource Timing).
+export function youtubePage({ layout = "watch" } = {}) {
+  const player = {
+    watch: 'id="movie_player" class="html5-video-player"',
+    embed: 'id="movie_player" class="html5-video-player"',
+    shorts: 'id="shorts-player" class="html5-video-player"',
+    mobile: 'class="html5-video-player"',
+  }[layout];
+  const controls =
+    layout === "watch" || layout === "embed"
+      ? `<div class="ytp-right-controls" style="position:absolute;right:8px;bottom:8px;display:flex"></div>`
+      : "";
   return page(
     "youtube",
     "Knight lesson - YouTube (mock)",
     `<script type="application/json" id="ltv-test-transcript">${JSON.stringify(
       LESSON.map(([start, end, text]) => ({ start, end, text })),
     )}</script>
-    <div id="movie_player" style="position:relative;width:854px;height:480px;background:#000">
+    <div ${player} data-mock-player style="position:relative;width:854px;height:480px;background:#000">
       <video class="html5-main-video" src="/media/silence.wav" style="width:100%;height:100%"></video>
-      <div class="ytp-right-controls" style="position:absolute;right:8px;bottom:8px;display:flex"></div>
+      ${controls}
     </div>`,
     `const params = new URL(location.href).searchParams;
     if (params.get("real") === "1") document.documentElement.dataset.ltvRealSpeech = "1";
     if (params.get("realasr") === "1") document.documentElement.dataset.ltvRealAsr = "1";
+    if (params.get("interim") === "1") document.documentElement.dataset.ltvTestInterim = "1";
     // nosub=1: video không có phụ đề (phát âm thanh ngắn 19 giây); tone=1: có tiếng tone.
     const noSubtitles = params.get("nosub") === "1";
     if (noSubtitles) {
       document.querySelector("video").src = params.get("tone") === "1" ? "/media/tone.wav" : "/media/short.wav";
     }
-    const player = document.getElementById("movie_player");
-    const videoId = params.get("v");
+    const player = document.querySelector("[data-mock-player]");
+    const videoId = params.get("v") || location.pathname.split("/").pop();
     const track = { baseUrl: "/api/timedtext?v=" + videoId + "&lang=en&kind=asr", languageCode: "en", kind: "asr",
       name: { simpleText: "English (auto-generated)" } };
     let currentTrack = {};
-    player.getPlayerResponse = () => ({ videoDetails: { videoId, title: "Knight lesson" },
-      captions: { playerCaptionsTracklistRenderer: { captionTracks: noSubtitles ? [] : [track] } } });
-    player.getOption = (module, key) => (key === "tracklist" ? [{ languageCode: "en", kind: "asr" }] : currentTrack);
+    if (${JSON.stringify(layout)} !== "embed") {
+      player.getPlayerResponse = () => ({ videoDetails: { videoId, title: "Knight lesson" },
+        captions: { playerCaptionsTracklistRenderer: { captionTracks: noSubtitles ? [] : [track] } } });
+    }
+    player.getVideoData = () => ({ video_id: videoId, title: "Knight lesson" });
+    player.getOption = (module, key) => (key === "tracklist"
+      ? (noSubtitles ? [] : [{ languageCode: "en", kind: "asr", displayName: "English (auto-generated)" }])
+      : currentTrack);
     player.loadModule = () => {};
     player.unloadModule = () => { window.__captionsUnloaded = true; document.body.dataset.captionsUnloaded = "1"; };
     player.setOption = (module, key, value) => {
       currentTrack = value;
       if (value && value.languageCode) {
+        document.body.dataset.setOptionCalls = String(Number(document.body.dataset.setOptionCalls || 0) + 1);
         const xhr = new XMLHttpRequest();
         xhr.open("GET", "/api/timedtext?v=" + videoId + "&lang=en&kind=asr&fmt=json3&pot=TOKEN");
         xhr.send();
       }
-    };`,
+    };
+    const signed = params.get("signed");
+    if (signed) {
+      const url = "/api/timedtext?v=" + videoId + "&lang=fr&name=&fmt=srv3&pot=TOKEN&signature=SIG";
+      if (signed === "img") new Image().src = url;
+      else { const xhr = new XMLHttpRequest(); xhr.open("GET", url); xhr.send(); }
+    }`,
   );
 }
 

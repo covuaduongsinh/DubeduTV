@@ -6,6 +6,7 @@ import "../src/content/lib/captions-parse.js";
 import "../src/content/lib/segment.js";
 import "../src/content/lib/timing.js";
 import "../src/content/lib/tracks.js";
+import "../src/content/lib/yt-timedtext.js";
 import "../src/content/dubber.js";
 import "../src/content/lib/audio-chunker.js";
 import "../src/content/providers/html5.js";
