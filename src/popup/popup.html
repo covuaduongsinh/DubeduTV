@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lồng Tiếng Việt</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <img src="../icons/icon32.png" alt="" width="24" height="24" />
+      <h1>Lồng Tiếng Việt</h1>
+      <span id="site" class="badge" hidden></span>
+    </header>
+
+    <section class="card" id="status-card">
+      <p id="status-text" class="status-text">Đang kiểm tra trang…</p>
+      <div class="progress" id="progress" hidden>
+        <div id="progress-bar"></div>
+      </div>
+      <div class="actions">
+        <button id="toggle" class="primary" hidden>Bật lồng tiếng</button>
+        <button id="inject" hidden>Thử lồng tiếng video trên trang này</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Ngôn ngữ &amp; bộ dịch</h2>
+      <div class="row">
+        <label for="sourceLang">Phụ đề gốc</label>
+        <select id="sourceLang" data-setting="sourceLang"></select>
+      </div>
+      <div class="row">
+        <label for="targetLang">Lồng tiếng sang</label>
+        <select id="targetLang" data-setting="targetLang"></select>
+      </div>
+      <div class="row">
+        <label for="translator">Bộ dịch</label>
+        <select id="translator" data-setting="translator">
+          <option value="google">Google Dịch (miễn phí)</option>
+          <option value="claude">Claude AI (cần API key)</option>
+        </select>
+      </div>
+      <p id="claude-hint" class="hint warn" hidden>
+        Chưa có API key Claude –
+        <a href="#" id="open-options-key">nhập trong Tuỳ chọn</a>. Đang tạm dùng
+        Google Dịch.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Giọng đọc</h2>
+      <div class="row">
+        <label for="voice">Giọng</label>
+        <select id="voice"></select>
+        <button id="preview" title="Nghe thử">▶</button>
+      </div>
+      <p id="voice-hint" class="hint" hidden></p>
+      <div class="row">
+        <label for="rate">Tốc độ</label>
+        <input
+          id="rate"
+          type="range"
+          min="0.5"
+          max="2.5"
+          step="0.05"
+          data-setting="rate"
+          data-format="x"
+        />
+        <span class="value" data-for="rate"></span>
+      </div>
+      <label class="check"
+        ><input type="checkbox" data-setting="autoRate" /> Tự tăng tốc khi câu
+        dài</label
+      >
+      <div class="row">
+        <label for="maxRate">Tăng tối đa</label>
+        <input
+          id="maxRate"
+          type="range"
+          min="1"
+          max="3"
+          step="0.1"
+          data-setting="maxRate"
+          data-format="x"
+        />
+        <span class="value" data-for="maxRate"></span>
+      </div>
+      <div class="row">
+        <label for="voiceVolume">Âm lượng giọng</label>
+        <input
+          id="voiceVolume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          data-setting="voiceVolume"
+          data-format="%"
+        />
+        <span class="value" data-for="voiceVolume"></span>
+      </div>
+      <div class="row">
+        <label for="duckVolume">Tiếng gốc khi đọc</label>
+        <input
+          id="duckVolume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          data-setting="duckVolume"
+          data-format="%"
+        />
+        <span class="value" data-for="duckVolume"></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Phụ đề trên video</h2>
+      <div class="row">
+        <label for="subtitleMode">Hiển thị</label>
+        <select id="subtitleMode" data-setting="subtitleMode">
+          <option value="translated">Bản dịch</option>
+          <option value="bilingual">Song ngữ</option>
+          <option value="original">Phụ đề gốc</option>
+          <option value="off">Tắt</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="subtitleSize">Cỡ chữ</label>
+        <input
+          id="subtitleSize"
+          type="range"
+          min="12"
+          max="48"
+          step="1"
+          data-setting="subtitleSize"
+          data-format="px"
+        />
+        <span class="value" data-for="subtitleSize"></span>
+      </div>
+      <label class="check"
+        ><input type="checkbox" data-setting="hideNativeCaptions" /> Ẩn phụ đề
+        gốc của trang khi lồng tiếng</label
+      >
+      <label class="check"
+        ><input type="checkbox" data-setting="autoStart" /> Tự bật lồng tiếng
+        khi mở video</label
+      >
+    </section>
+
+    <footer>
+      <a href="#" id="open-options">Tuỳ chọn nâng cao</a>
+      <span class="muted">Phím tắt: Alt+Shift+D</span>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

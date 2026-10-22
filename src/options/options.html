@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tuỳ chọn – Lồng Tiếng Việt</title>
+    <link rel="stylesheet" href="../shared/ui.css" />
+    <style>
+      body {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        font-size: 14px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+      ul {
+        margin: 6px 0 0;
+        padding-left: 20px;
+      }
+      li {
+        margin: 4px 0;
+      }
+      .buttons {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      #test-result {
+        margin: 8px 0 0;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="../icons/icon48.png" alt="" width="36" height="36" />
+      <h1>Lồng Tiếng Việt – Tuỳ chọn</h1>
+    </header>
+
+    <section class="card">
+      <h2>Dịch bằng Claude AI</h2>
+      <p class="muted">
+        Claude dịch tự nhiên, đúng thuật ngữ hơn Google Dịch. Cần API key từ
+        <a
+          href="https://console.anthropic.com/settings/keys"
+          target="_blank"
+          rel="noopener"
+          >console.anthropic.com</a
+        >
+        (tính phí theo lượng dùng). Key chỉ lưu trên máy này và chỉ gửi tới
+        api.anthropic.com.
+      </p>
+      <div class="row">
+        <label for="api-key">API key</label>
+        <input
+          id="api-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="sk-ant-…"
+        />
+        <button id="toggle-key" type="button">Hiện</button>
+      </div>
+      <div class="row">
+        <label for="model">Model</label>
+        <select id="model"></select>
+      </div>
+      <div class="buttons">
+        <button id="save-key" class="primary" type="button">Lưu</button>
+        <button id="test-key" type="button">Kiểm tra key</button>
+        <button id="remove-key" type="button">Xoá key</button>
+      </div>
+      <p id="test-result" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Giọng đọc tiếng Việt</h2>
+      <ul>
+        <li>
+          <b>Google (trực tuyến)</b> – mặc định, có sẵn trên mọi máy, cần mạng.
+        </li>
+        <li>
+          <b>Giọng máy</b> – đọc offline, không giới hạn. Windows: Cài đặt →
+          Thời gian &amp; ngôn ngữ → Giọng nói → thêm giọng Tiếng Việt
+          (Microsoft An). macOS: Cài đặt hệ thống → Trợ năng → Nội dung đọc →
+          thêm giọng Linh.
+        </li>
+        <li>
+          <b>Microsoft Edge</b> có sẵn giọng tự nhiên <i>HoaiMy</i> và
+          <i>NamMinh</i> – cài tiện ích này trên Edge rồi chọn trong mục Giọng.
+        </li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Bộ nhớ đệm bản dịch</h2>
+      <p id="cache-stats" class="muted">Đang đọc…</p>
+      <div class="buttons">
+        <button id="clear-cache" type="button">Xoá bộ nhớ đệm</button>
+      </div>
+    </section>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

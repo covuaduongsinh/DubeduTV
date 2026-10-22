@@ -1,0 +1,16 @@
+{
+  "name": "long-tieng-viet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tiện ích Chrome lồng tiếng Việt cho video YouTube, Udemy và Coursera.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:test": "node scripts/build.mjs --test",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "e2e": "node tests/e2e/run.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,54 @@
+body {
+  width: 360px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header h1 {
+  flex: 1 1 auto;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.status-text {
+  margin: 0;
+  min-height: 1.45em;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.actions button {
+  width: 100%;
+  padding: 8px 10px;
+}
+
+#preview {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
