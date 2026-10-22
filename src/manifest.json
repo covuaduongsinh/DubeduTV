@@ -82,6 +82,7 @@
         "content/lib/hls.js",
         "content/lib/drive-timedtext.js",
         "content/lib/drive-channel.js",
+        "content/lib/quiz-text.js",
         "content/providers/html5.js",
         "content/providers/youtube.js",
         "content/providers/udemy.js",
@@ -96,6 +97,8 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/badges.js",
+        "content/quiz.js",
         "content/addons.js",
         "content/main.js"
       ],
@@ -137,6 +140,7 @@
         "content/lib/hls.js",
         "content/lib/drive-timedtext.js",
         "content/lib/drive-channel.js",
+        "content/lib/quiz-text.js",
         "content/providers/html5.js",
         "content/providers/youtube.js",
         "content/providers/udemy.js",
@@ -151,6 +155,8 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/badges.js",
+        "content/quiz.js",
         "content/addons.js",
         "content/main.js"
       ],

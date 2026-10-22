@@ -15,6 +15,7 @@ import {
   whisperErrorScenario,
 } from "./live-scenarios.mjs";
 import { waitForStatus } from "./page-helpers.mjs";
+import { addonScenarios } from "./addon-scenarios.mjs";
 import { frameScenarios } from "./frame-scenarios.mjs";
 import { startServer } from "./server.mjs";
 import {
@@ -160,6 +161,7 @@ function selectScenarios(context, worker) {
     ],
     youtube: youtubeVariants(context, baseUrl),
     frames: frameScenarios(context, { baseUrl, worker }),
+    addons: addonScenarios(context, { baseUrl, worker }),
   };
   const wanted = (process.env.LTV_E2E_GROUPS || Object.keys(groups).join(","))
     .split(",")

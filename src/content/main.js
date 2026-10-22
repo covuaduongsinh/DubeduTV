@@ -35,6 +35,7 @@
   const voice = LTV.createVoiceFallback({ connection, getSettings, setStatus });
   const effectiveSettings = voice.effectiveSettings;
   const auto = LTV.createAutoStart({ connection, getSettings, isTop });
+  let addons = null;
 
   function pickProvider() {
     if (typeof LTV.pickProvider === "function")
@@ -427,6 +428,7 @@
       ),
     });
     if ("voiceEngine" in changes) voice.reset();
+    addons?.refresh();
     if (state.session) {
       applyNativeCaptionStyle(state.session);
       state.ui.overlay?.refresh();
@@ -474,7 +476,7 @@
     chrome.runtime.onMessage.addListener(onRuntimeMessage);
     watchNavigation();
     evaluate();
-    LTV.startAddons({
+    addons = LTV.startAddons({
       connection,
       getSettings,
       siteId: pickProvider()?.id || null,

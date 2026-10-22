@@ -4,8 +4,21 @@
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
-  LTV.startAddons = function startAddons({ isTop }) {
-    if (!isTop) return;
-    if (LTV.driveHost?.matches(location)) LTV.driveHost.start();
+  // Trả về { refresh } để cập nhật khi cài đặt thay đổi.
+  LTV.startAddons = function startAddons({
+    connection,
+    getSettings,
+    siteId,
+    isTop,
+  }) {
+    const parts = [];
+    if (isTop) {
+      if (LTV.driveHost?.matches(location)) LTV.driveHost.start();
+      if (siteId === "youtube")
+        parts.push(LTV.createBadges({ connection, getSettings }));
+      if (siteId === "coursera" || siteId === "udemy")
+        parts.push(LTV.createQuizTranslator({ connection, getSettings }));
+    }
+    return { refresh: () => parts.forEach((part) => part.refresh()) };
   };
 })(globalThis);
