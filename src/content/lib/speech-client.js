@@ -1,5 +1,6 @@
 // Phía content của giọng đọc: speak() trả Promise khi câu kết thúc với
-// { ok, event, message, elapsed } – elapsed là số giây thực sự đã đọc.
+// { ok, event, message, code, elapsed } – elapsed là số giây thực sự đã đọc,
+// code cho biết loại lỗi (vd. "auth": API key giọng AI sai).
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
@@ -10,7 +11,7 @@
     let current = null;
     let sequence = 0;
 
-    function finish(event, message) {
+    function finish(event, message, code = "") {
       const utterance = current;
       if (!utterance) return;
       current = null;
@@ -18,7 +19,7 @@
       const elapsed = utterance.startedAt
         ? (performance.now() - utterance.startedAt) / 1000
         : 0;
-      utterance.resolve({ ok: event === "end", event, message, elapsed });
+      utterance.resolve({ ok: event === "end", event, message, code, elapsed });
     }
 
     const unsubscribe = connection.onMessage((message) => {
@@ -33,7 +34,7 @@
       )
         return;
       if (message.event === "start") current.startedAt = performance.now();
-      else finish(message.event, message.message);
+      else finish(message.event, message.message, message.code);
     });
 
     function speak({ text, rate, lang }) {
@@ -57,8 +58,7 @@
           rate,
           volume: settings.voiceVolume,
           engine: settings.voiceEngine,
-          voiceName:
-            settings.voiceEngine === "system" ? settings.systemVoice : "",
+          voiceName: LTV.voiceNameFor(settings),
         });
         if (!sent)
           finish("error", "Tiện ích vừa được cập nhật – hãy tải lại trang.");
@@ -71,10 +71,17 @@
       finish("interrupted");
     }
 
+    // Giọng máy đọc ngay nên không cần tải trước.
     function prefetch(texts, lang) {
       const settings = getSettings();
-      if (settings.voiceEngine !== "google" || texts.length === 0) return;
-      connection.post({ type: "prefetch", engine: "google", texts, lang });
+      if (settings.voiceEngine === "system" || texts.length === 0) return;
+      connection.post({
+        type: "prefetch",
+        engine: settings.voiceEngine,
+        voiceName: LTV.voiceNameFor(settings),
+        texts,
+        lang,
+      });
     }
 
     function dispose() {

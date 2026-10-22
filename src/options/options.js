@@ -10,49 +10,103 @@ const WHISPER_PROVIDERS = [
   ["openai", "OpenAI – whisper-1"],
 ];
 
-// Một mục nhập API key (Claude hoặc Whisper): lưu ở storage.local, lựa chọn
-// đi kèm (model / nhà cung cấp) lưu ở storage.sync.
+// Một mục nhập API key (Claude, Whisper, giọng AI): key lưu ở storage.local,
+// lựa chọn đi kèm (model / nhà cung cấp / vùng) lưu ở storage.sync.
 function bindKeySection(config, settings) {
   const id = (name) => $(`${config.prefix}-${name}`);
   const showResult = (text, tone = "") => {
     id("result").textContent = text;
     id("result").className = `hint ${tone}`;
   };
-  const select = id("select");
-  select.replaceChildren(
-    ...config.options.map(([value, label]) => new Option(label, value)),
-  );
-  select.value = settings[config.selectSetting];
-  select.addEventListener("change", () =>
-    chrome.storage.sync.set({ [config.selectSetting]: select.value }),
-  );
+  // Lựa chọn đi kèm là tuỳ chọn (Google Cloud không có).
+  const select = config.options ? id("select") : null;
+  if (select) {
+    select.replaceChildren(
+      ...config.options.map(([value, label]) => new Option(label, value)),
+    );
+    select.value = settings[config.selectSetting];
+    select.addEventListener("change", () =>
+      chrome.storage.sync.set({ [config.selectSetting]: select.value }),
+    );
+  }
   id("toggle").addEventListener("click", () => {
     const hidden = id("key").type === "password";
     id("key").type = hidden ? "text" : "password";
     id("toggle").textContent = hidden ? "Ẩn" : "Hiện";
   });
+  async function runTest(prefix = "") {
+    showResult(`${prefix}Đang kiểm tra…`, "muted");
+    const response = await chrome.runtime.sendMessage({
+      ...config.testExtra,
+      type: config.testType,
+      apiKey: id("key").value.trim(),
+      ...(select ? { [config.testField]: select.value } : {}),
+    });
+    if (response?.ok) showResult(prefix + config.okText(response), "");
+    else showResult(`${prefix}Lỗi: ${response?.error || "không rõ"}`, "error");
+  }
   id("save").addEventListener("click", async () => {
     const key = id("key").value.trim();
     await chrome.storage.local.set({ [config.storageKey]: key });
     if (key) await chrome.storage.sync.set(config.enable);
     showResult(key ? config.savedText : "Đã lưu (key trống).", "muted");
+    // Giọng AI: tải luôn danh sách giọng để chọn trong popup.
+    if (key && config.testOnSave) await runTest(`${config.savedText} `);
   });
   id("remove").addEventListener("click", async () => {
     id("key").value = "";
     await chrome.storage.local.remove(config.storageKey);
-    await chrome.storage.sync.set(config.disable);
+    // Chỉ trả về mặc định khi tiện ích còn đang dùng dịch vụ này.
+    const current = await chrome.storage.sync.get(Object.keys(config.enable));
+    const revert = Object.fromEntries(
+      Object.entries(config.disable).filter(
+        ([key]) => current[key] === config.enable[key],
+      ),
+    );
+    if (Object.keys(revert).length > 0) await chrome.storage.sync.set(revert);
     showResult(config.removedText, "muted");
   });
-  id("test").addEventListener("click", async () => {
-    showResult("Đang kiểm tra…", "muted");
-    const response = await chrome.runtime.sendMessage({
-      type: config.testType,
-      apiKey: id("key").value.trim(),
-      [config.testField]: select.value,
-    });
-    if (response?.ok) showResult(config.okText(response), "");
-    else showResult(`Lỗi: ${response?.error || "không rõ"}`, "error");
-  });
+  id("test").addEventListener("click", () => runTest());
+}
+
+const cloudOkText = (response) =>
+  `Key hoạt động: ${response.count} giọng, trong đó ${response.vietnamese} giọng tiếng Việt. Chọn giọng trong popup → Giọng.`;
+
+// Giọng AI đám mây: Azure (có chọn vùng) và Google Cloud.
+function bindCloudVoices(settings) {
+  bindKeySection(
+    {
+      prefix: "azure",
+      storageKey: "azureTtsKey",
+      options: LTV.AZURE_REGIONS,
+      selectSetting: "azureRegion",
+      enable: { voiceEngine: "azure" },
+      disable: { voiceEngine: "google" },
+      savedText: "Đã lưu. Giọng đọc đã chuyển sang Azure.",
+      removedText: "Đã xoá key Azure.",
+      testType: "ltv:testCloudTts",
+      testExtra: { engine: "azure" },
+      testField: "region",
+      testOnSave: true,
+      okText: cloudOkText,
+    },
+    settings,
+  );
+  bindKeySection(
+    {
+      prefix: "gcloud",
+      storageKey: "gcloudTtsKey",
+      enable: { voiceEngine: "gcloud" },
+      disable: { voiceEngine: "google" },
+      savedText: "Đã lưu. Giọng đọc đã chuyển sang Google Cloud.",
+      removedText: "Đã xoá key Google Cloud.",
+      testType: "ltv:testCloudTts",
+      testExtra: { engine: "gcloud" },
+      testOnSave: true,
+      okText: cloudOkText,
+    },
+    settings,
+  );
 }
 
 // Từ điển thuật ngữ riêng (storage.sync, tối đa 2000 ký tự).
@@ -84,9 +138,13 @@ async function init() {
   const keys = await chrome.storage.local.get([
     "claudeApiKey",
     "whisperApiKey",
+    "azureTtsKey",
+    "gcloudTtsKey",
   ]);
   $("claude-key").value = keys.claudeApiKey || "";
   $("whisper-key").value = keys.whisperApiKey || "";
+  $("azure-key").value = keys.azureTtsKey || "";
+  $("gcloud-key").value = keys.gcloudTtsKey || "";
   bindKeySection(
     {
       prefix: "claude",
@@ -120,6 +178,7 @@ async function init() {
     settings,
   );
   bindCustomTerms(settings);
+  bindCloudVoices(settings);
   $("clear-cache").addEventListener("click", async () => {
     await chrome.runtime.sendMessage({ type: "ltv:cacheClear" });
     refreshStats();

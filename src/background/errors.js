@@ -13,3 +13,5 @@ export class ServiceError extends Error {
 export class TranslateError extends ServiceError {}
 
 export class TranscribeError extends ServiceError {}
+
+export class SpeechError extends ServiceError {}

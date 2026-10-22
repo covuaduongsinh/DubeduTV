@@ -2,14 +2,11 @@ import "../shared/defaults.js";
 import "../shared/frame-probe.js";
 import { initChromePack } from "./chrome-pack.js";
 import { initTabLive } from "./tab-live.js";
+import { initVoiceSelect } from "./voice-select.js";
 
 const LTV = globalThis.LTV;
 const $ = (id) => document.getElementById(id);
 const SAVE_DELAY_MS = 300;
-const PREVIEW_TEXT = {
-  vi: "Xin chào! Đây là giọng đọc lồng tiếng cho video của bạn.",
-  en: "Hello! This is the dubbing voice for your video.",
-};
 
 const PROBE_EVERY_MS = 3000;
 
@@ -31,6 +28,10 @@ const chromePack = initChromePack({
 });
 const pendingSave = {};
 let saveTimer = null;
+const voiceSelect = initVoiceSelect({
+  getSettings: () => settings,
+  saveSetting,
+});
 
 function saveSetting(key, value) {
   settings = { ...settings, [key]: value };
@@ -82,7 +83,7 @@ function bindSettings() {
       else if (typeof LTV.DEFAULTS[key] === "number") value = Number(value);
       saveSetting(key, value);
       renderSettings();
-      if (key === "targetLang") loadVoices();
+      if (key === "targetLang") voiceSelect.load();
       if (key === "translator" || key === "asrEngine") checkKeys();
       if (["translator", "sourceLang", "targetLang"].includes(key))
         chromePack.refresh();
@@ -92,69 +93,6 @@ function bindSettings() {
       handler,
     );
   }
-}
-
-async function loadVoices() {
-  const select = $("voice");
-  const base = LTV.baseLang(settings.targetLang);
-  const voices = (await chrome.tts.getVoices()).filter(
-    (voice) =>
-      voice.voiceName && voice.lang && LTV.baseLang(voice.lang) === base,
-  );
-  const options = [new Option("Google (trực tuyến)", "google")];
-  const group = document.createElement("optgroup");
-  group.label =
-    voices.length > 0
-      ? "Giọng cài trên máy"
-      : "Máy chưa có giọng cho ngôn ngữ này";
-  for (const voice of voices) {
-    group.appendChild(
-      new Option(
-        `${voice.voiceName}${voice.remote ? " (trực tuyến)" : ""}`,
-        `system::${voice.voiceName}`,
-      ),
-    );
-  }
-  select.replaceChildren(...options, group);
-  const current =
-    settings.voiceEngine === "system"
-      ? `system::${settings.systemVoice}`
-      : "google";
-  select.value = Array.from(select.options).some(
-    (option) => option.value === current,
-  )
-    ? current
-    : "google";
-  $("voice-hint").hidden = voices.length > 0;
-  $("voice-hint").textContent =
-    "Mẹo: cài giọng tiếng Việt cho Windows/macOS, hoặc dùng Microsoft Edge để có giọng HoaiMy/NamMinh tự nhiên.";
-}
-
-function bindVoice() {
-  $("voice").addEventListener("change", () => {
-    const value = $("voice").value;
-    if (value === "google") {
-      saveSetting("voiceEngine", "google");
-    } else {
-      saveSetting("voiceEngine", "system");
-      saveSetting("systemVoice", value.slice("system::".length));
-    }
-  });
-  $("preview").addEventListener("click", () => {
-    chrome.runtime.sendMessage({
-      type: "ltv:preview",
-      utterance: {
-        text:
-          PREVIEW_TEXT[LTV.baseLang(settings.targetLang)] || PREVIEW_TEXT.en,
-        lang: settings.targetLang,
-        rate: settings.rate,
-        volume: settings.voiceVolume,
-        engine: settings.voiceEngine,
-        voiceName:
-          settings.voiceEngine === "system" ? settings.systemVoice : "",
-      },
-    });
-  });
 }
 
 // Nhắc nhập key khi đã chọn Claude/Whisper mà chưa có key.
@@ -304,10 +242,10 @@ async function init() {
   fillLanguageSelects();
   renderSettings();
   bindSettings();
-  bindVoice();
+  voiceSelect.bind();
   bindActions();
   await Promise.all([
-    loadVoices(),
+    voiceSelect.load(),
     checkKeys(),
     refreshStatus(),
     chromePack.refresh(),

@@ -5,6 +5,7 @@ import "../shared/frame-probe.js";
 import { translateGoogle } from "./translate-google.js";
 import { translateClaude } from "./translate-claude.js";
 import { createSpeech } from "./tts.js";
+import { createCloudSpeech } from "./tts-cloud.js";
 import { createOffscreenDoc } from "./offscreen-doc.js";
 import { createTranslateRouter } from "./translate-router.js";
 import { createChromeTranslate } from "./translate-chrome.js";
@@ -43,6 +44,11 @@ const speech = createSpeech({
 async function readSettings() {
   return LTV.mergeSettings(await chrome.storage.sync.get(null));
 }
+
+const cloudSpeech = createCloudSpeech({
+  storage: chrome.storage.local,
+  readSettings,
+});
 
 const translate = createTranslateRouter({
   google: translateGoogle,
@@ -147,9 +153,12 @@ const portHandlers = {
     speech.stop(ctx.owner);
   },
   prefetch: async (message) => {
-    if (message.engine === "google") {
-      await speech.prefetch(message.texts, message.lang);
-    }
+    await speech.prefetch({
+      texts: message.texts,
+      lang: message.lang,
+      engine: message.engine,
+      voice: message.voiceName,
+    });
   },
   "cache:get": async (message) => ({
     type: "cache",
@@ -288,6 +297,10 @@ const messageHandlers = {
     await cache.clear();
     return { ok: true };
   },
+  "ltv:testCloudTts": async (message) => ({
+    ok: true,
+    ...(await cloudSpeech.test(message)),
+  }),
   "ltv:testWhisper": async (message) => {
     await testWhisperKey(message);
     return { ok: true };
@@ -319,10 +332,13 @@ const messageHandlers = {
 };
 
 // Tin từ offscreen document: sự kiện giọng đọc, sự kiện nghe cả thẻ, và yêu
-// cầu chép lời Whisper (service worker giữ API key).
+// cầu chép lời Whisper / đọc bằng giọng AI (service worker giữ API key).
 function handleOffscreenMessage(message, sendResponse) {
   if (message.type === "speech") speech.handleOffscreenEvent(message);
-  else if (message.type === "tabLive:event")
+  else if (message.type === "tts:synthesize") {
+    cloudSpeech.synthesize(message).then(sendResponse);
+    return true;
+  } else if (message.type === "tabLive:event")
     tabLive.relay(message).catch(() => {});
   else if (message.type === "offscreen:asr") {
     transcribeChunk(message.message || {}).then((reply) =>

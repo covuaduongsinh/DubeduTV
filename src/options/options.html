@@ -36,6 +36,10 @@
         flex-wrap: wrap;
         margin-top: 8px;
       }
+      h3 {
+        font-size: 15px;
+        margin: 14px 0 4px;
+      }
       #test-result {
         margin: 8px 0 0;
         white-space: pre-wrap;
@@ -158,7 +162,90 @@
     </section>
 
     <section class="card">
-      <h2>Giọng đọc tiếng Việt</h2>
+      <h2>Giọng AI tự nhiên (Azure, Google Cloud)</h2>
+      <p class="muted">
+        Giọng neural đọc tự nhiên như người thật – Azure có <i>HoaiMy</i> (nữ)
+        và <i>NamMinh</i> (nam); Google Cloud có các giọng tiếng Việt WaveNet,
+        Neural2, Chirp3-HD. Cần API key riêng, tính phí theo số ký tự đọc (có
+        hạn mức miễn phí hằng tháng). Key chỉ lưu trên máy này và chỉ gửi tới
+        dịch vụ tương ứng. Lưu key xong, chọn giọng trong popup → Giọng.
+      </p>
+
+      <h3>Azure AI Speech</h3>
+      <p class="hint">
+        <a
+          href="https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices"
+          target="_blank"
+          rel="noopener"
+          >Tạo tài nguyên Speech</a
+        >
+        (gói F0 miễn phí hoặc S0) → mục <i>Keys and Endpoint</i>: chép KEY 1 và
+        <i>Location/Region</i>.
+      </p>
+      <div class="row">
+        <label for="azure-key">API key</label>
+        <input
+          id="azure-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="azure-toggle" type="button">Hiện</button>
+      </div>
+      <div class="row">
+        <label for="azure-select">Vùng</label>
+        <select id="azure-select"></select>
+      </div>
+      <div class="buttons">
+        <button id="azure-save" class="primary" type="button">Lưu</button>
+        <button id="azure-test" type="button">Kiểm tra key</button>
+        <button id="azure-remove" type="button">Xoá key</button>
+      </div>
+      <p id="azure-result" class="hint"></p>
+
+      <h3>Google Cloud Text-to-Speech</h3>
+      <p class="hint">
+        Trong
+        <a
+          href="https://console.cloud.google.com/apis/library/texttospeech.googleapis.com"
+          target="_blank"
+          rel="noopener"
+          >Google Cloud Console</a
+        >
+        bật <i>Cloud Text-to-Speech API</i>, rồi vào APIs &amp; Services →
+        Credentials → Create credentials → API key (nên giới hạn key chỉ dùng
+        Text-to-Speech API).
+      </p>
+      <div class="row">
+        <label for="gcloud-key">API key</label>
+        <input
+          id="gcloud-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="AIza…"
+        />
+        <button id="gcloud-toggle" type="button">Hiện</button>
+      </div>
+      <div class="buttons">
+        <button id="gcloud-save" class="primary" type="button">Lưu</button>
+        <button id="gcloud-test" type="button">Kiểm tra key</button>
+        <button id="gcloud-remove" type="button">Xoá key</button>
+      </div>
+      <p id="gcloud-result" class="hint"></p>
+
+      <p class="hint">
+        Chi phí ước tính (hãy đối chiếu bảng giá chính thức): Azure gói F0 miễn
+        phí 0,5 triệu ký tự/tháng; Google Cloud miễn phí 1 triệu ký tự/tháng cho
+        giọng WaveNet/Neural2. Một bài giảng 10 phút cần khoảng 8–10 nghìn ký
+        tự. Gói F0 của Azure giới hạn số yêu cầu mỗi phút – nếu giọng hay bị
+        ngắt, hãy chuyển sang S0. Giọng AI lỗi liên tục hoặc key sai thì tiện
+        ích tạm đọc bằng giọng Google.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Giọng đọc miễn phí</h2>
       <ul>
         <li>
           <b>Google (trực tuyến)</b> – mặc định, có sẵn trên mọi máy, cần mạng.
@@ -171,7 +258,8 @@
         </li>
         <li>
           <b>Microsoft Edge</b> có sẵn giọng tự nhiên <i>HoaiMy</i> và
-          <i>NamMinh</i> – cài tiện ích này trên Edge rồi chọn trong mục Giọng.
+          <i>NamMinh</i> miễn phí – cài tiện ích này trên Edge rồi chọn trong
+          mục Giọng.
         </li>
       </ul>
     </section>

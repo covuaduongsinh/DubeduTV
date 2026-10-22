@@ -1,7 +1,12 @@
 // Điều phối giọng đọc, mỗi lúc chỉ một câu:
 //   "system" – chrome.tts (giọng cài trên máy / trình duyệt, chạy offline)
-//   "google" – MP3 từ Google Dịch, phát trong offscreen document.
-// Mỗi câu nhận đúng một sự kiện kết thúc: end | interrupted | error.
+//   "google" – MP3 từ Google Dịch, phát trong offscreen document
+//   "azure" | "gcloud" – giọng AI đám mây (tts-cloud.js), cũng phát trong
+//   offscreen document; offscreen xin âm thanh từ service worker.
+// Mỗi câu nhận đúng một sự kiện kết thúc: end | interrupted | error (kèm
+// code, vd. "auth" khi API key giọng AI sai).
+
+const OFFSCREEN_ENGINES = new Set(["google", "azure", "gcloud"]);
 
 function clamp(value, min, max) {
   const number = Number(value);
@@ -43,7 +48,7 @@ export function createSpeech({
 }) {
   let current = null;
 
-  function report(utterance, event, message) {
+  function report(utterance, event, message, code) {
     if (utterance.finished) return;
     if (event !== "start") {
       utterance.finished = true;
@@ -54,10 +59,11 @@ export function createSpeech({
       uttId: utterance.uttId,
       event,
       message,
+      code: code || "",
     });
   }
 
-  async function speakGoogle(utterance) {
+  async function speakOffscreen(utterance) {
     await ensureOffscreen();
     await runtime.sendMessage({
       target: "offscreen",
@@ -67,6 +73,8 @@ export function createSpeech({
       lang: utterance.lang,
       rate: clamp(utterance.rate, 0.5, 4),
       volume: clamp(utterance.volume, 0, 1),
+      engine: utterance.engine,
+      voice: utterance.engine === "google" ? "" : utterance.voiceName || "",
     });
   }
 
@@ -86,7 +94,10 @@ export function createSpeech({
     stop();
     const utterance = {
       ...request,
-      engine: request.engine === "system" ? "system" : "google",
+      engine:
+        request.engine === "system" || OFFSCREEN_ENGINES.has(request.engine)
+          ? request.engine
+          : "google",
     };
     current = utterance;
     try {
@@ -94,27 +105,31 @@ export function createSpeech({
         speakSystem({ tts, runtime }, utterance, (event, message) =>
           report(utterance, event, message),
         );
-      } else await speakGoogle(utterance);
+      } else await speakOffscreen(utterance);
     } catch (error) {
       report(utterance, "error", error?.message || String(error));
     }
   }
 
-  // Sự kiện từ offscreen document: { uttId, event, message }.
+  // Sự kiện từ offscreen document: { uttId, event, message, code }.
   function handleOffscreenEvent(message) {
     if (current && current.uttId === message.uttId) {
-      report(current, message.event, message.message);
+      report(current, message.event, message.message, message.code);
     }
   }
 
-  async function prefetch(texts, lang) {
+  // Tải trước âm thanh các câu sắp đọc (giọng phát trong offscreen).
+  async function prefetch({ texts, lang, engine, voice }) {
     if (!Array.isArray(texts) || texts.length === 0) return;
+    if (!OFFSCREEN_ENGINES.has(engine)) return;
     await ensureOffscreen();
     await runtime.sendMessage({
       target: "offscreen",
       type: "prefetch",
       texts,
       lang,
+      engine,
+      voice: engine === "google" ? "" : String(voice || ""),
     });
   }
 

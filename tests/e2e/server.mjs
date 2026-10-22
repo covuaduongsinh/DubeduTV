@@ -25,6 +25,7 @@ import {
   xSegment,
   xSubtitlePlaylist,
 } from "./fixtures-sites.mjs";
+import { handleTts, isTtsRequest } from "./tts-mock.mjs";
 
 export const requests = [];
 
@@ -164,6 +165,7 @@ export function startServer() {
       });
       response.end(body);
     };
+    if (isTtsRequest(url.pathname)) return handleTts(url, request, send);
     if (files[url.pathname]) return send(200, "audio/wav", files[url.pathname]);
     const page = route(url, request, origins);
     if (page) return send(page[0], page[1], page[2], page[3]);

@@ -6,6 +6,8 @@ const EXCLUDED_HOSTS = new Set([
   "api.groq.com",
   "api.openai.com",
   "translate.googleapis.com",
+  "*.tts.speech.microsoft.com",
+  "texttospeech.googleapis.com",
 ]);
 
 function patternToRegExp(pattern) {

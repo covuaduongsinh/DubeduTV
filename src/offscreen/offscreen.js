@@ -1,4 +1,5 @@
-// Offscreen document: tải giọng đọc Google Dịch (MP3) và phát bằng <audio>,
+// Offscreen document: tải giọng đọc (MP3 của Google Dịch, hoặc giọng AI
+// Azure/Google Cloud do service worker gọi bằng API key) và phát bằng <audio>,
 // giữ cao độ khi tăng tốc, có cache nhỏ để đọc trước các câu sắp tới; dịch
 // trên máy bằng Translator API của Chrome (LTV.chromeAI); và nghe âm thanh
 // cả thẻ (LTV.createTabCapture).
@@ -6,12 +7,14 @@
   const LTV = globalThis.LTV;
   const TTS_ENDPOINT = "https://translate.google.com/translate_tts";
   const MAX_CHUNK = 180;
+  // Giọng AI nhận đoạn dài hơn nhiều; cắt vừa phải để câu dài đọc sớm.
+  const MAX_CLOUD_CHUNK = 1000;
   const MAX_CACHE = 40;
 
   const cache = new Map();
   let playing = null;
 
-  function send(uttId, event, message) {
+  function send(uttId, event, message, code) {
     chrome.runtime
       .sendMessage({
         target: "background",
@@ -19,6 +22,7 @@
         uttId,
         event,
         message,
+        code,
       })
       .catch(() => {});
   }
@@ -41,16 +45,47 @@
     return blob;
   }
 
-  function load(text, lang) {
-    const key = `${lang}|${text}`;
+  function base64ToBlob(audio, mime) {
+    const bytes = Uint8Array.from(atob(audio), (char) => char.charCodeAt(0));
+    return new Blob([bytes], { type: mime || "audio/mpeg" });
+  }
+
+  // Giọng AI: service worker giữ API key nên gọi dịch vụ thay offscreen.
+  async function fetchCloudChunk(text, { lang, engine, voice }) {
+    const reply = await chrome.runtime.sendMessage({
+      target: "background",
+      type: "tts:synthesize",
+      engine,
+      voice,
+      lang,
+      text,
+    });
+    if (!reply?.ok) {
+      const error = new Error(reply?.error || "Giọng AI không phản hồi");
+      error.code = reply?.code || "";
+      throw error;
+    }
+    return base64ToBlob(reply.audio, reply.mime);
+  }
+
+  // source: { lang, engine: "google" | "azure" | "gcloud", voice }.
+  function load(text, source) {
+    const cloud = source.engine === "azure" || source.engine === "gcloud";
+    const key = cloud
+      ? `${source.engine}|${source.voice}|${source.lang}|${text}`
+      : `google|${source.lang}|${text}`;
     if (cache.has(key)) {
       const hit = cache.get(key);
       cache.delete(key);
       cache.set(key, hit);
       return hit;
     }
-    const chunks = LTV.splitForTts(text, MAX_CHUNK);
-    const promise = Promise.all(chunks.map((chunk) => fetchChunk(chunk, lang)));
+    const chunks = LTV.splitForTts(text, cloud ? MAX_CLOUD_CHUNK : MAX_CHUNK);
+    const promise = Promise.all(
+      chunks.map((chunk) =>
+        cloud ? fetchCloudChunk(chunk, source) : fetchChunk(chunk, source.lang),
+      ),
+    );
     promise.catch(() => cache.delete(key));
     cache.set(key, promise);
     while (cache.size > MAX_CACHE) cache.delete(cache.keys().next().value);
@@ -101,12 +136,12 @@
     send(session.uttId, "interrupted");
   }
 
-  async function play({ uttId, text, lang, rate, volume }) {
+  async function play({ uttId, text, lang, rate, volume, engine, voice }) {
     stop();
     const session = { uttId, rate, volume, cancelled: false, abort: null };
     playing = session;
     try {
-      const blobs = await load(text, lang);
+      const blobs = await load(text, { lang, engine, voice });
       for (let index = 0; index < blobs.length; index += 1) {
         if (session.cancelled) return;
         await playBlob(session, blobs[index], index === 0);
@@ -114,7 +149,7 @@
       if (!session.cancelled) send(uttId, "end");
     } catch (error) {
       if (!session.cancelled)
-        send(uttId, "error", error?.message || String(error));
+        send(uttId, "error", error?.message || String(error), error?.code);
     } finally {
       if (playing === session) playing = null;
     }
@@ -168,8 +203,9 @@
     if (message.type === "play") play(message);
     else if (message.type === "stop") stop();
     else if (message.type === "prefetch") {
+      const { lang, engine, voice } = message;
       for (const text of message.texts || [])
-        load(text, message.lang).catch(() => {});
+        load(text, { lang, engine, voice }).catch(() => {});
     }
     return false;
   });

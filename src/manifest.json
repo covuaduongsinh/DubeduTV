@@ -43,7 +43,9 @@
     "https://translate.google.com/*",
     "https://api.anthropic.com/*",
     "https://api.groq.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://*.tts.speech.microsoft.com/*",
+    "https://texttospeech.googleapis.com/*"
   ],
   "content_scripts": [
     {

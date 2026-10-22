@@ -11,8 +11,13 @@
     sourceLang: "auto",
     translator: "google",
     claudeModel: "claude-opus-5-5",
+    // Giọng đọc: "google" | "system" (giọng máy) | "azure" | "gcloud" (giọng AI
+    // đám mây, cần API key). Tên giọng trống = giọng mặc định theo ngôn ngữ.
     voiceEngine: "google",
     systemVoice: "",
+    azureVoice: "",
+    gcloudVoice: "",
+    azureRegion: "southeastasia",
     rate: 1.1,
     maxRate: 1.8,
     autoRate: true,
@@ -55,6 +60,41 @@
     ["auto", "Tự nhận diện (chỉ Whisper)"],
   ];
 
+  // Vùng của tài nguyên Azure Speech (tên vùng nằm trong tên máy chủ API).
+  const AZURE_REGIONS = [
+    ["southeastasia", "Southeast Asia (Singapore)"],
+    ["eastasia", "East Asia (Hồng Kông)"],
+    ["japaneast", "Japan East"],
+    ["koreacentral", "Korea Central"],
+    ["australiaeast", "Australia East"],
+    ["centralindia", "Central India"],
+    ["eastus", "East US"],
+    ["eastus2", "East US 2"],
+    ["westus", "West US"],
+    ["westus2", "West US 2"],
+    ["westus3", "West US 3"],
+    ["centralus", "Central US"],
+    ["canadacentral", "Canada Central"],
+    ["brazilsouth", "Brazil South"],
+    ["northeurope", "North Europe"],
+    ["westeurope", "West Europe"],
+    ["uksouth", "UK South"],
+    ["francecentral", "France Central"],
+    ["germanywestcentral", "Germany West Central"],
+    ["swedencentral", "Sweden Central"],
+    ["switzerlandnorth", "Switzerland North"],
+  ];
+  LTV.AZURE_REGIONS = AZURE_REGIONS;
+  LTV.CLOUD_VOICE_ENGINES = ["azure", "gcloud"];
+
+  // Tên giọng gửi kèm yêu cầu đọc theo bộ giọng đang chọn.
+  LTV.voiceNameFor = function voiceNameFor(settings) {
+    if (settings.voiceEngine === "system") return settings.systemVoice;
+    if (settings.voiceEngine === "azure") return settings.azureVoice;
+    if (settings.voiceEngine === "gcloud") return settings.gcloudVoice;
+    return "";
+  };
+
   // Giới hạn hợp lệ cho các cài đặt dạng số.
   const NUMBER_RANGES = {
     rate: [0.5, 2.5],
@@ -68,7 +108,8 @@
     autoStart: ["off", "cached", "always"],
     glossaryMode: ["auto", "chess", "off"],
     translator: ["google", "claude", "chrome"],
-    voiceEngine: ["google", "system"],
+    voiceEngine: ["google", "system", "azure", "gcloud"],
+    azureRegion: AZURE_REGIONS.map(([code]) => code),
     subtitleMode: ["translated", "bilingual", "original", "off"],
     asrEngine: ["chrome", "whisper"],
     asrLang: LTV.SPEECH_LANGUAGES.map(([code]) => code),

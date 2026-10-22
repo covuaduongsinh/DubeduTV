@@ -19,6 +19,7 @@ import { waitForStatus } from "./page-helpers.mjs";
 import { addonScenarios } from "./addon-scenarios.mjs";
 import { frameScenarios, tabLiveScenario } from "./frame-scenarios.mjs";
 import { startServer } from "./server.mjs";
+import { cloudVoiceScenario } from "./voice-scenarios.mjs";
 import {
   runSite,
   udemyChecks,
@@ -163,6 +164,7 @@ function selectScenarios(context, worker) {
     youtube: youtubeVariants(context, baseUrl),
     frames: frameScenarios(context, { baseUrl, worker }),
     addons: addonScenarios(context, { baseUrl, worker }),
+    voices: [() => cloudVoiceScenario(context, { baseUrl, worker })],
     live: [
       () => interimScenario(context, { baseUrl, worker }),
       () => tabLiveScenario(context, { baseUrl, worker }),

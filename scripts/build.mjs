@@ -108,6 +108,12 @@ function patchOffscreenForTests(path) {
   );
 }
 
+// Service worker của bản kiểm thử: endpoint giọng AI trỏ được sang máy chủ giả lập.
+function patchWorkerForTests(path) {
+  const source = readFileSync(path, "utf8");
+  writeFileSync(path, `${source}\nimport "../test/test-background.js";\n`);
+}
+
 // Bộ script của trang chính và của khung nhúng phải giống nhau.
 function checkBundles(manifest) {
   const bundles = manifest.content_scripts
@@ -129,9 +135,14 @@ function build() {
   checkBundles(manifest);
   if (isTest) {
     mkdirSync(join(outDir, "test"), { recursive: true });
-    for (const file of ["test-overrides.js", "test-offscreen.js"])
+    for (const file of [
+      "test-overrides.js",
+      "test-offscreen.js",
+      "test-background.js",
+    ])
       cpSync(join(root, "tests", "e2e", file), join(outDir, "test", file));
     patchOffscreenForTests(join(outDir, "offscreen", "offscreen.html"));
+    patchWorkerForTests(join(outDir, "background", "service-worker.js"));
     manifest = patchForTests(manifest);
   }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

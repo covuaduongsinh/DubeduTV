@@ -428,7 +428,20 @@
     return false;
   }
 
+  // Đổi giọng, vùng hay API key giọng AI: bỏ giọng dự phòng đang dùng tạm.
+  const VOICE_KEYS = {
+    sync: [
+      "voiceEngine",
+      "systemVoice",
+      "azureVoice",
+      "gcloudVoice",
+      "azureRegion",
+    ],
+    local: ["azureTtsKey", "gcloudTtsKey"],
+  };
+
   function onSettingsChanged(changes, area) {
+    if (VOICE_KEYS[area]?.some((key) => key in changes)) voice.reset();
     if (area !== "sync") return;
     const previous = state.settings;
     state.settings = LTV.mergeSettings({
@@ -437,7 +450,6 @@
         Object.entries(changes).map(([k, v]) => [k, v.newValue]),
       ),
     });
-    if ("voiceEngine" in changes) voice.reset();
     addons?.refresh();
     if (state.session) {
       applyNativeCaptionStyle(state.session);
