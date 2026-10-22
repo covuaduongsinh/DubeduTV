@@ -1,4 +1,5 @@
 import "../shared/defaults.js";
+import { initChromePack } from "../popup/chrome-pack.js";
 
 const LTV = globalThis.LTV;
 const $ = (id) => document.getElementById(id);
@@ -115,6 +116,12 @@ async function init() {
     refreshStats();
   });
   refreshStats();
+  initChromePack({
+    getSettings: () => settings,
+    getSourceLang: () =>
+      settings.sourceLang !== "auto" ? settings.sourceLang : "en",
+    isVisible: () => true,
+  }).refresh();
 }
 
 init();

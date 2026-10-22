@@ -210,6 +210,7 @@
     if (sentences.length === 0)
       throw LTV.captionError("Phụ đề của video này trống.");
     session.sentences = sentences;
+    session.lang = captions.lang;
     session.label = captions.label || captions.lang;
     if (!captions.needsTranslation) {
       for (const sentence of sentences) sentence.tr = sentence.text;
@@ -361,6 +362,7 @@
         : session?.progress || null,
       sentences: session?.sentences?.length || 0,
       engineOverride: voice.override(),
+      lang: session?.lang || null,
     };
   }
 

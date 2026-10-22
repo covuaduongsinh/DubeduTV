@@ -62,7 +62,7 @@
 
   const ENUMS = {
     autoStart: ["off", "cached", "always"],
-    translator: ["google", "claude"],
+    translator: ["google", "claude", "chrome"],
     voiceEngine: ["google", "system"],
     subtitleMode: ["translated", "bilingual", "original", "off"],
     asrEngine: ["chrome", "whisper"],

@@ -1,4 +1,5 @@
 import "../shared/defaults.js";
+import { initChromePack } from "./chrome-pack.js";
 
 const LTV = globalThis.LTV;
 const $ = (id) => document.getElementById(id);
@@ -10,6 +11,16 @@ const PREVIEW_TEXT = {
 
 let settings = LTV.mergeSettings({});
 let tab = null;
+let lastStatus = null;
+const chromePack = initChromePack({
+  getSettings: () => settings,
+  // Ngôn ngữ gốc: cài đặt, hoặc ngôn ngữ phụ đề của video đang mở.
+  getSourceLang: () =>
+    settings.sourceLang !== "auto"
+      ? settings.sourceLang
+      : lastStatus?.lang || "en",
+  isVisible: () => settings.translator === "chrome",
+});
 const pendingSave = {};
 let saveTimer = null;
 
@@ -65,6 +76,8 @@ function bindSettings() {
       renderSettings();
       if (key === "targetLang") loadVoices();
       if (key === "translator" || key === "asrEngine") checkKeys();
+      if (["translator", "sourceLang", "targetLang"].includes(key))
+        chromePack.refresh();
     };
     element.addEventListener(
       element.type === "range" ? "input" : "change",
@@ -167,6 +180,11 @@ function describeStatus(status) {
 }
 
 function renderStatus(status) {
+  if (status?.lang && status.lang !== lastStatus?.lang) {
+    lastStatus = status;
+    chromePack.refresh();
+  }
+  lastStatus = status;
   const text = $("status-text");
   const toggle = $("toggle");
   const inject = $("inject");
@@ -257,7 +275,12 @@ async function init() {
   bindSettings();
   bindVoice();
   bindActions();
-  await Promise.all([loadVoices(), checkKeys(), refreshStatus()]);
+  await Promise.all([
+    loadVoices(),
+    checkKeys(),
+    refreshStatus(),
+    chromePack.refresh(),
+  ]);
   setInterval(refreshStatus, 1000);
 }
 

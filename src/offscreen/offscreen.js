@@ -1,5 +1,6 @@
 // Offscreen document: tải giọng đọc Google Dịch (MP3) và phát bằng <audio>,
-// giữ cao độ khi tăng tốc. Có cache nhỏ để đọc trước các câu sắp tới.
+// giữ cao độ khi tăng tốc, có cache nhỏ để đọc trước các câu sắp tới; và
+// dịch trên máy bằng Translator API của Chrome (LTV.chromeAI).
 (function () {
   const LTV = globalThis.LTV;
   const TTS_ENDPOINT = "https://translate.google.com/translate_tts";
@@ -118,13 +119,25 @@
     }
   }
 
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message?.target !== "offscreen") return;
+  function translate(message, sendResponse) {
+    LTV.chromeAI
+      .translate(message)
+      .then(sendResponse, (error) =>
+        sendResponse({ ok: false, code: "error", error: error?.message }),
+      );
+    return true;
+  }
+
+  // Chỉ nhận lệnh từ service worker (không từ content script trong trang).
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message?.target !== "offscreen" || sender.tab) return false;
+    if (message.type === "translate") return translate(message, sendResponse);
     if (message.type === "play") play(message);
     else if (message.type === "stop") stop();
     else if (message.type === "prefetch") {
       for (const text of message.texts || [])
         load(text, message.lang).catch(() => {});
     }
+    return false;
   });
 })();

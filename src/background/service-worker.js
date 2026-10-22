@@ -6,6 +6,7 @@ import { translateClaude } from "./translate-claude.js";
 import { createSpeech } from "./tts.js";
 import { createOffscreenDoc } from "./offscreen-doc.js";
 import { createTranslateRouter } from "./translate-router.js";
+import { createChromeTranslate } from "./translate-chrome.js";
 import { createCache } from "./cache.js";
 import { createFetchGuard } from "./fetch-guard.js";
 import { testWhisperKey, transcribeWhisper } from "./transcribe-whisper.js";
@@ -52,6 +53,9 @@ const translate = createTranslateRouter({
         model: claudeModel,
       });
     },
+    chrome: createChromeTranslate({
+      ensureOffscreen: () => offscreenDoc.ensure(),
+    }),
   },
 });
 
