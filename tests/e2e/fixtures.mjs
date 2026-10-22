@@ -39,7 +39,8 @@ export function lessonJson3() {
   return JSON.stringify({ wireMagic: "pb3", events });
 }
 
-export function silenceWav(seconds = 40, sampleRate = 8000) {
+// Âm thanh PCM 16-bit mono: im lặng, hoặc tone 440 Hz (để bộ cắt đoạn thấy "có tiếng").
+export function silenceWav(seconds = 40, sampleRate = 8000, tone = false) {
   const dataSize = seconds * sampleRate * 2;
   const buffer = Buffer.alloc(44 + dataSize);
   buffer.write("RIFF", 0);
@@ -54,6 +55,12 @@ export function silenceWav(seconds = 40, sampleRate = 8000) {
   buffer.writeUInt16LE(16, 34);
   buffer.write("data", 36);
   buffer.writeUInt32LE(dataSize, 40);
+  if (tone) {
+    for (let i = 0; i < seconds * sampleRate; i += 1) {
+      const sample = Math.sin((2 * Math.PI * 440 * i) / sampleRate) * 12000;
+      buffer.writeInt16LE(Math.round(sample), 44 + i * 2);
+    }
+  }
   return buffer;
 }
 
@@ -69,18 +76,28 @@ export function youtubePage() {
   return page(
     "youtube",
     "Knight lesson - YouTube (mock)",
-    `<div id="movie_player" style="position:relative;width:854px;height:480px;background:#000">
+    `<script type="application/json" id="ltv-test-transcript">${JSON.stringify(
+      LESSON.map(([start, end, text]) => ({ start, end, text })),
+    )}</script>
+    <div id="movie_player" style="position:relative;width:854px;height:480px;background:#000">
       <video class="html5-main-video" src="/media/silence.wav" style="width:100%;height:100%"></video>
       <div class="ytp-right-controls" style="position:absolute;right:8px;bottom:8px;display:flex"></div>
     </div>`,
-    `if (new URL(location.href).searchParams.get("real") === "1") document.documentElement.dataset.ltvRealSpeech = "1";
+    `const params = new URL(location.href).searchParams;
+    if (params.get("real") === "1") document.documentElement.dataset.ltvRealSpeech = "1";
+    if (params.get("realasr") === "1") document.documentElement.dataset.ltvRealAsr = "1";
+    // nosub=1: video không có phụ đề (phát âm thanh ngắn 19 giây); tone=1: có tiếng tone.
+    const noSubtitles = params.get("nosub") === "1";
+    if (noSubtitles) {
+      document.querySelector("video").src = params.get("tone") === "1" ? "/media/tone.wav" : "/media/short.wav";
+    }
     const player = document.getElementById("movie_player");
-    const videoId = new URL(location.href).searchParams.get("v");
+    const videoId = params.get("v");
     const track = { baseUrl: "/api/timedtext?v=" + videoId + "&lang=en&kind=asr", languageCode: "en", kind: "asr",
       name: { simpleText: "English (auto-generated)" } };
     let currentTrack = {};
     player.getPlayerResponse = () => ({ videoDetails: { videoId, title: "Knight lesson" },
-      captions: { playerCaptionsTracklistRenderer: { captionTracks: [track] } } });
+      captions: { playerCaptionsTracklistRenderer: { captionTracks: noSubtitles ? [] : [track] } } });
     player.getOption = (module, key) => (key === "tracklist" ? [{ languageCode: "en", kind: "asr" }] : currentTrack);
     player.loadModule = () => {};
     player.unloadModule = () => { window.__captionsUnloaded = true; document.body.dataset.captionsUnloaded = "1"; };

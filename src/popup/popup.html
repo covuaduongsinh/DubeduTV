@@ -149,6 +149,41 @@
       >
     </section>
 
+    <section class="card">
+      <h2>Video không có phụ đề</h2>
+      <label class="check"
+        ><input type="checkbox" data-setting="asrEnabled" /> Tự nghe, chép lời
+        rồi lồng tiếng</label
+      >
+      <div class="row">
+        <label for="asrLang">Ngôn ngữ nói</label>
+        <select id="asrLang" data-setting="asrLang"></select>
+      </div>
+      <div class="row">
+        <label for="asrEngine">Chép lời bằng</label>
+        <select id="asrEngine" data-setting="asrEngine">
+          <option value="chrome">Chrome (miễn phí)</option>
+          <option value="whisper">Whisper (cần API key)</option>
+        </select>
+      </div>
+      <p id="whisper-hint" class="hint warn" hidden>
+        Chưa có API key Whisper –
+        <a href="#" id="open-options-whisper">nhập trong Tuỳ chọn</a>. Đang dùng
+        Chrome.
+      </p>
+      <div class="row">
+        <label for="liveMode">Cách đồng bộ</label>
+        <select id="liveMode" data-setting="liveMode">
+          <option value="consecutive">Nối tiếp – tự dừng video</option>
+          <option value="parallel">Song song – trễ vài giây</option>
+        </select>
+      </div>
+      <p class="hint">
+        Lời đã chép được lưu lại: lần xem sau lồng tiếng khớp như video có phụ
+        đề.
+      </p>
+    </section>
+
     <footer>
       <a href="#" id="open-options">Tuỳ chọn nâng cao</a>
       <span class="muted">Phím tắt: Alt+Shift+D</span>

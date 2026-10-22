@@ -299,5 +299,6 @@
     };
   };
 
+  LTV.createDucker = createDucker;
   LTV.dubberInternals = { activeIndex, lastStartedAt, tooLate, nextAction };
 })(globalThis);

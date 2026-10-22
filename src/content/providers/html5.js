@@ -5,9 +5,14 @@
   const LTV = (root.LTV = root.LTV || {});
   LTV.providers = LTV.providers || [];
 
-  LTV.captionError = function captionError(message) {
+  // noCaptions: video không có phụ đề dùng được → có thể chuyển sang tự chép lời.
+  LTV.captionError = function captionError(
+    message,
+    { noCaptions = false } = {},
+  ) {
     const error = new Error(message);
     error.userMessage = message;
+    error.noCaptions = noCaptions;
     return error;
   };
 
@@ -164,6 +169,7 @@
       if (!result) {
         throw LTV.captionError(
           "Video trên trang này không có phụ đề đọc được nên chưa lồng tiếng được.",
+          { noCaptions: true },
         );
       }
       return { ...result, title: document.title };

@@ -3,6 +3,8 @@
 
 const EXCLUDED_HOSTS = new Set([
   "api.anthropic.com",
+  "api.groq.com",
+  "api.openai.com",
   "translate.googleapis.com",
 ]);
 

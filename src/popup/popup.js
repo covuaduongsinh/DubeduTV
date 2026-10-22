@@ -35,6 +35,7 @@ function fillLanguageSelects() {
   for (const [id, list] of [
     ["sourceLang", LTV.SOURCE_LANGUAGES],
     ["targetLang", LTV.TARGET_LANGUAGES],
+    ["asrLang", LTV.SPEECH_LANGUAGES],
   ]) {
     $(id).replaceChildren(
       ...list.map(([code, name]) => new Option(name, code)),
@@ -63,7 +64,7 @@ function bindSettings() {
       saveSetting(key, value);
       renderSettings();
       if (key === "targetLang") loadVoices();
-      if (key === "translator") checkClaudeKey();
+      if (key === "translator" || key === "asrEngine") checkKeys();
     };
     element.addEventListener(
       element.type === "range" ? "input" : "change",
@@ -135,10 +136,16 @@ function bindVoice() {
   });
 }
 
-async function checkClaudeKey() {
-  const { claudeApiKey } = await chrome.storage.local.get("claudeApiKey");
+// Nhắc nhập key khi đã chọn Claude/Whisper mà chưa có key.
+async function checkKeys() {
+  const { claudeApiKey, whisperApiKey } = await chrome.storage.local.get([
+    "claudeApiKey",
+    "whisperApiKey",
+  ]);
   $("claude-hint").hidden =
     settings.translator !== "claude" || Boolean(claudeApiKey);
+  $("whisper-hint").hidden =
+    settings.asrEngine !== "whisper" || Boolean(whisperApiKey);
 }
 
 function describeStatus(status) {
@@ -230,7 +237,11 @@ function bindActions() {
     }
     refreshStatus();
   });
-  for (const id of ["open-options", "open-options-key"]) {
+  for (const id of [
+    "open-options",
+    "open-options-key",
+    "open-options-whisper",
+  ]) {
     $(id).addEventListener("click", (event) => {
       event.preventDefault();
       chrome.runtime.openOptionsPage();
@@ -246,7 +257,7 @@ async function init() {
   bindSettings();
   bindVoice();
   bindActions();
-  await Promise.all([loadVoices(), checkClaudeKey(), refreshStatus()]);
+  await Promise.all([loadVoices(), checkKeys(), refreshStatus()]);
   setInterval(refreshStatus, 1000);
 }
 

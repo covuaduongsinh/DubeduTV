@@ -12,7 +12,12 @@
     "sourceLang",
     "translator",
     "claudeModel",
+    "asrEnabled",
+    "asrEngine",
+    "asrLang",
   ];
+  // Lời chép đã lưu phủ ít nhất ngần này thời lượng thì dùng như phụ đề.
+  const TRANSCRIPT_MIN_COVERAGE = 0.9;
 
   const connection = LTV.createConnection();
   const bridge = LTV.bridge;
@@ -123,6 +128,7 @@
     state.session = null;
     session.controller.abort();
     session.queue?.cancel();
+    session.live?.stop();
     session.dubber?.stop();
     session.speech?.dispose();
     session.style?.remove();
@@ -190,6 +196,55 @@
     });
   }
 
+  // Lời chép từ lần xem trước, nếu phủ gần hết video thì dùng như phụ đề.
+  async function savedTranscript(session) {
+    let entry = null;
+    try {
+      const response = await connection.request(
+        { type: "transcript:get", key: session.id },
+        10000,
+      );
+      entry = response.entry;
+    } catch {
+      entry = null;
+    }
+    if (!entry || !(entry.coverage >= TRANSCRIPT_MIN_COVERAGE)) return null;
+    return {
+      cues: entry.cues,
+      lang: entry.lang,
+      needsTranslation: !LTV.tracks.sameLang(
+        entry.lang,
+        state.settings.targetLang,
+      ),
+      label: "lời chép tự động đã lưu",
+      title: document.title,
+    };
+  }
+
+  async function startLive(session, video) {
+    if (!state.settings.asrEnabled) throw session.noCaptions;
+    session.mode = "live";
+    setStatus("loading", "Video không có phụ đề – chuẩn bị tự chép lời…", {
+      sticky: true,
+    });
+    session.live = LTV.createLiveSession({
+      sessionId: session.id,
+      video,
+      connection,
+      signal: session.signal,
+      title: document.title,
+      getSettings: () => state.settings,
+      effectiveSettings,
+      isSuspended: () => Boolean(session.provider.isSuspended?.()),
+      makeSpeech: () =>
+        LTV.createSpeechClient({ connection, getSettings: effectiveSettings }),
+      setStatus,
+      onLine: (sentence) => state.ui.overlay?.setLine(sentence),
+      onSpeechResult: handleSpeechResult,
+    });
+    await session.live.start();
+  }
+
   async function prepareSession(session) {
     const { provider, signal } = session;
     const video = await LTV.util.waitFor(() => ensureUi(provider), {
@@ -207,7 +262,18 @@
       bridge,
       connection,
     };
-    const captions = await provider.loadCaptions(ctx);
+    let captions;
+    try {
+      captions = await provider.loadCaptions(ctx);
+    } catch (error) {
+      if (!error.noCaptions || signal.aborted) throw error;
+      captions = await savedTranscript(session);
+      if (!captions) {
+        // Không có phụ đề: startSession chuyển sang tự chép lời.
+        session.noCaptions = error;
+        return video;
+      }
+    }
     if (signal.aborted) return null;
     const sentences = LTV.segment.buildSentences(captions.cues);
     if (sentences.length === 0)
@@ -242,6 +308,10 @@
     try {
       const video = await prepareSession(session);
       if (!video || session.signal.aborted) return;
+      if (session.noCaptions) {
+        await startLive(session, video);
+        return;
+      }
       applyNativeCaptionStyle(session);
       const makeSpeech = LTV.createSpeechClient;
       session.speech = makeSpeech({
@@ -329,7 +399,10 @@
       onVideo: Boolean(provider && provider.videoKey(location)),
       active: state.active,
       status: state.status,
-      progress: session?.progress || null,
+      mode: session ? session.mode || "subtitles" : null,
+      progress: session?.live
+        ? session.live.progress()
+        : session?.progress || null,
       sentences: session?.sentences?.length || 0,
       engineOverride: state.engineOverride,
     };

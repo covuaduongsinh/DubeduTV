@@ -3,70 +3,118 @@ import "../shared/defaults.js";
 const LTV = globalThis.LTV;
 const $ = (id) => document.getElementById(id);
 
-function showResult(text, tone = "") {
-  $("test-result").textContent = text;
-  $("test-result").className = `hint ${tone}`;
+const WHISPER_PROVIDERS = [
+  ["groq", "Groq – whisper-large-v3-turbo (rẻ, nhanh)"],
+  ["openai", "OpenAI – whisper-1"],
+];
+
+// Một mục nhập API key (Claude hoặc Whisper): lưu ở storage.local, lựa chọn
+// đi kèm (model / nhà cung cấp) lưu ở storage.sync.
+function bindKeySection(config, settings) {
+  const id = (name) => $(`${config.prefix}-${name}`);
+  const showResult = (text, tone = "") => {
+    id("result").textContent = text;
+    id("result").className = `hint ${tone}`;
+  };
+  const select = id("select");
+  select.replaceChildren(
+    ...config.options.map(([value, label]) => new Option(label, value)),
+  );
+  select.value = settings[config.selectSetting];
+  select.addEventListener("change", () =>
+    chrome.storage.sync.set({ [config.selectSetting]: select.value }),
+  );
+  id("toggle").addEventListener("click", () => {
+    const hidden = id("key").type === "password";
+    id("key").type = hidden ? "text" : "password";
+    id("toggle").textContent = hidden ? "Ẩn" : "Hiện";
+  });
+  id("save").addEventListener("click", async () => {
+    const key = id("key").value.trim();
+    await chrome.storage.local.set({ [config.storageKey]: key });
+    if (key) await chrome.storage.sync.set(config.enable);
+    showResult(key ? config.savedText : "Đã lưu (key trống).", "muted");
+  });
+  id("remove").addEventListener("click", async () => {
+    id("key").value = "";
+    await chrome.storage.local.remove(config.storageKey);
+    await chrome.storage.sync.set(config.disable);
+    showResult(config.removedText, "muted");
+  });
+  id("test").addEventListener("click", async () => {
+    showResult("Đang kiểm tra…", "muted");
+    const response = await chrome.runtime.sendMessage({
+      type: config.testType,
+      apiKey: id("key").value.trim(),
+      [config.testField]: select.value,
+    });
+    if (response?.ok) showResult(config.okText(response), "");
+    else showResult(`Lỗi: ${response?.error || "không rõ"}`, "error");
+  });
 }
 
-async function refreshCacheStats() {
-  const stats = await chrome.runtime.sendMessage({ type: "ltv:cacheStats" });
-  if (!stats?.ok) {
-    $("cache-stats").textContent = "Không đọc được bộ nhớ đệm.";
-    return;
-  }
-  const megabytes = (stats.bytes / (1024 * 1024)).toFixed(2);
-  $("cache-stats").textContent =
-    `Đang lưu bản dịch của ${stats.videos} video (${megabytes} MB).`;
+async function refreshStats() {
+  const [cache, transcripts] = await Promise.all([
+    chrome.runtime.sendMessage({ type: "ltv:cacheStats" }),
+    chrome.runtime.sendMessage({ type: "ltv:transcriptStats" }),
+  ]);
+  $("cache-stats").textContent = cache?.ok
+    ? `Đang lưu bản dịch của ${cache.videos} video (${(cache.bytes / (1024 * 1024)).toFixed(2)} MB).`
+    : "Không đọc được bộ nhớ đệm.";
+  $("transcript-stats").textContent = transcripts?.ok
+    ? `Đang lưu lời chép của ${transcripts.videos} video.`
+    : "Không đọc được lời chép đã lưu.";
 }
 
 async function init() {
   const settings = LTV.mergeSettings(await chrome.storage.sync.get(null));
-  const { claudeApiKey } = await chrome.storage.local.get("claudeApiKey");
-  $("api-key").value = claudeApiKey || "";
-  $("model").replaceChildren(
-    ...LTV.CLAUDE_MODELS.map(([id, label]) => new Option(label, id)),
+  const keys = await chrome.storage.local.get([
+    "claudeApiKey",
+    "whisperApiKey",
+  ]);
+  $("claude-key").value = keys.claudeApiKey || "";
+  $("whisper-key").value = keys.whisperApiKey || "";
+  bindKeySection(
+    {
+      prefix: "claude",
+      storageKey: "claudeApiKey",
+      options: LTV.CLAUDE_MODELS,
+      selectSetting: "claudeModel",
+      enable: { translator: "claude" },
+      disable: { translator: "google" },
+      savedText: "Đã lưu. Bộ dịch đã chuyển sang Claude.",
+      removedText: "Đã xoá key. Bộ dịch quay về Google Dịch.",
+      testType: "ltv:testClaude",
+      testField: "model",
+      okText: (response) => `Key hoạt động. Bản dịch thử:\n“${response.text}”`,
+    },
+    settings,
   );
-  $("model").value = settings.claudeModel;
-
-  $("model").addEventListener("change", () =>
-    chrome.storage.sync.set({ claudeModel: $("model").value }),
+  bindKeySection(
+    {
+      prefix: "whisper",
+      storageKey: "whisperApiKey",
+      options: WHISPER_PROVIDERS,
+      selectSetting: "whisperProvider",
+      enable: { asrEngine: "whisper" },
+      disable: { asrEngine: "chrome" },
+      savedText: "Đã lưu. Video không có phụ đề sẽ được chép lời bằng Whisper.",
+      removedText: "Đã xoá key. Quay về chép lời bằng Chrome (miễn phí).",
+      testType: "ltv:testWhisper",
+      testField: "provider",
+      okText: () => "Key hoạt động.",
+    },
+    settings,
   );
-  $("toggle-key").addEventListener("click", () => {
-    const hidden = $("api-key").type === "password";
-    $("api-key").type = hidden ? "text" : "password";
-    $("toggle-key").textContent = hidden ? "Ẩn" : "Hiện";
-  });
-  $("save-key").addEventListener("click", async () => {
-    const key = $("api-key").value.trim();
-    await chrome.storage.local.set({ claudeApiKey: key });
-    if (key) await chrome.storage.sync.set({ translator: "claude" });
-    showResult(
-      key ? "Đã lưu. Bộ dịch đã chuyển sang Claude." : "Đã lưu (key trống).",
-      "muted",
-    );
-  });
-  $("remove-key").addEventListener("click", async () => {
-    $("api-key").value = "";
-    await chrome.storage.local.remove("claudeApiKey");
-    await chrome.storage.sync.set({ translator: "google" });
-    showResult("Đã xoá key. Bộ dịch quay về Google Dịch.", "muted");
-  });
-  $("test-key").addEventListener("click", async () => {
-    showResult("Đang gửi một câu thử…", "muted");
-    const response = await chrome.runtime.sendMessage({
-      type: "ltv:testClaude",
-      apiKey: $("api-key").value.trim(),
-      model: $("model").value,
-    });
-    if (response?.ok)
-      showResult(`Key hoạt động. Bản dịch thử:\n“${response.text}”`, "");
-    else showResult(`Lỗi: ${response?.error || "không rõ"}`, "error");
-  });
   $("clear-cache").addEventListener("click", async () => {
     await chrome.runtime.sendMessage({ type: "ltv:cacheClear" });
-    refreshCacheStats();
+    refreshStats();
   });
-  refreshCacheStats();
+  $("clear-transcripts").addEventListener("click", async () => {
+    await chrome.runtime.sendMessage({ type: "ltv:transcriptClear" });
+    refreshStats();
+  });
+  refreshStats();
 }
 
 init();

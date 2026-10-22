@@ -62,26 +62,60 @@
         api.anthropic.com.
       </p>
       <div class="row">
-        <label for="api-key">API key</label>
+        <label for="claude-key">API key</label>
         <input
-          id="api-key"
+          id="claude-key"
           type="password"
           autocomplete="off"
           spellcheck="false"
           placeholder="sk-ant-…"
         />
-        <button id="toggle-key" type="button">Hiện</button>
+        <button id="claude-toggle" type="button">Hiện</button>
       </div>
       <div class="row">
-        <label for="model">Model</label>
-        <select id="model"></select>
+        <label for="claude-select">Model</label>
+        <select id="claude-select"></select>
       </div>
       <div class="buttons">
-        <button id="save-key" class="primary" type="button">Lưu</button>
-        <button id="test-key" type="button">Kiểm tra key</button>
-        <button id="remove-key" type="button">Xoá key</button>
+        <button id="claude-save" class="primary" type="button">Lưu</button>
+        <button id="claude-test" type="button">Kiểm tra key</button>
+        <button id="claude-remove" type="button">Xoá key</button>
       </div>
-      <p id="test-result" class="hint"></p>
+      <p id="claude-result" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <h2>Chép lời video không có phụ đề bằng Whisper</h2>
+      <p class="muted">
+        Mặc định tiện ích chép lời miễn phí bằng nhận dạng giọng nói của Google
+        Chrome (Chrome 139+). Whisper chính xác hơn, khớp thời gian tốt hơn và
+        chạy được trên mọi trình duyệt nhân Chromium. Groq rẻ và nhanh (khoảng
+        0,04 USD cho 1 giờ video) – lấy key tại
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener"
+          >console.groq.com</a
+        >; hoặc dùng key OpenAI. Key chỉ lưu trên máy này.
+      </p>
+      <div class="row">
+        <label for="whisper-key">API key</label>
+        <input
+          id="whisper-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="gsk_… hoặc sk-…"
+        />
+        <button id="whisper-toggle" type="button">Hiện</button>
+      </div>
+      <div class="row">
+        <label for="whisper-select">Nhà cung cấp</label>
+        <select id="whisper-select"></select>
+      </div>
+      <div class="buttons">
+        <button id="whisper-save" class="primary" type="button">Lưu</button>
+        <button id="whisper-test" type="button">Kiểm tra key</button>
+        <button id="whisper-remove" type="button">Xoá key</button>
+      </div>
+      <p id="whisper-result" class="hint"></p>
     </section>
 
     <section class="card">
@@ -108,6 +142,20 @@
       <p id="cache-stats" class="muted">Đang đọc…</p>
       <div class="buttons">
         <button id="clear-cache" type="button">Xoá bộ nhớ đệm</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Lời chép đã lưu</h2>
+      <p id="transcript-stats" class="muted">Đang đọc…</p>
+      <p class="hint">
+        Video không có phụ đề được chép lời trong lúc xem; lần xem sau tiện ích
+        dùng lại lời chép để lồng tiếng khớp thời gian.
+      </p>
+      <div class="buttons">
+        <button id="clear-transcripts" type="button">
+          Xoá lời chép đã lưu
+        </button>
       </div>
     </section>
 

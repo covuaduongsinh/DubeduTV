@@ -29,6 +29,7 @@
       if (!result) {
         throw LTV.captionError(
           "Bài giảng Coursera này chưa có phụ đề đọc được. Hãy bật phụ đề (CC) rồi thử lại.",
+          { noCaptions: true },
         );
       }
       return { ...result, title: document.title };

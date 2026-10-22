@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Lồng Tiếng Việt – lồng tiếng YouTube, Udemy, Coursera",
   "short_name": "Lồng Tiếng Việt",
-  "version": "1.0.0",
-  "description": "Dịch phụ đề và đọc lồng tiếng Việt ngay trên video YouTube, Udemy, Coursera. Giọng Google hoặc giọng máy, dịch bằng Google hoặc Claude.",
+  "version": "1.1.0",
+  "description": "Dịch phụ đề – hoặc tự chép lời khi video không có phụ đề – rồi đọc lồng tiếng Việt ngay trên YouTube, Udemy, Coursera.",
   "minimum_chrome_version": "116",
   "icons": {
     "16": "icons/icon16.png",
@@ -32,7 +32,9 @@
     "https://*.coursera.org/*",
     "https://translate.googleapis.com/*",
     "https://translate.google.com/*",
-    "https://api.anthropic.com/*"
+    "https://api.anthropic.com/*",
+    "https://api.groq.com/*",
+    "https://api.openai.com/*"
   ],
   "content_scripts": [
     {
@@ -62,12 +64,17 @@
         "content/lib/connection.js",
         "content/lib/speech-client.js",
         "content/lib/translate-queue.js",
+        "content/lib/audio-chunker.js",
         "content/lib/overlay.js",
         "content/providers/html5.js",
         "content/providers/youtube.js",
         "content/providers/udemy.js",
         "content/providers/coursera.js",
         "content/dubber.js",
+        "content/asr/chrome-recognizer.js",
+        "content/asr/whisper-recognizer.js",
+        "content/live-dubber.js",
+        "content/live-session.js",
         "content/main.js"
       ],
       "run_at": "document_idle"
@@ -75,7 +82,9 @@
   ],
   "commands": {
     "toggle-dubbing": {
-      "suggested_key": { "default": "Alt+Shift+D" },
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
       "description": "Bật/tắt lồng tiếng video đang xem"
     }
   }

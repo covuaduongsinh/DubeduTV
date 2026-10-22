@@ -14,6 +14,34 @@
     return LTV.providers.find((provider) => provider.matches(loc)) || null;
   };
 
+  // Bộ chép lời giả: phát lời theo kịch bản <script id="ltv-test-transcript">
+  // khi video chạy qua mỗi câu (Chromium thử nghiệm không có dịch vụ nhận dạng
+  // của Google). <html data-ltv-real-asr="1"> để dùng bộ nhận dạng thật.
+  const realAsr = () => document.documentElement.dataset.ltvRealAsr === "1";
+  const createRealRecognizer = LTV.createChromeRecognizer;
+  const realSupported = LTV.chromeRecognizerSupported;
+  LTV.chromeRecognizerSupported = () => (realAsr() ? realSupported() : true);
+  LTV.createChromeRecognizer = function createChromeRecognizer(deps) {
+    if (realAsr()) return createRealRecognizer(deps);
+    const source = document.getElementById("ltv-test-transcript");
+    const pending = JSON.parse(source?.textContent || "[]");
+    let timer = null;
+    return {
+      engine: "chrome",
+      async start({ onSegment }) {
+        timer = setInterval(() => {
+          while (
+            pending.length > 0 &&
+            pending[0].end + 0.4 <= deps.video.currentTime
+          ) {
+            onSegment(pending.shift());
+          }
+        }, 100);
+      },
+      stop: () => clearInterval(timer),
+    };
+  };
+
   const createRealSpeech = LTV.createSpeechClient;
   LTV.createSpeechClient = function createSpeechClient(deps) {
     if (document.documentElement.dataset.ltvRealSpeech === "1")
@@ -45,6 +73,7 @@
           rate,
           lang,
           at: Math.round(video.currentTime * 100) / 100,
+          pausedAtStart: video.paused,
         };
         log.push(entry);
         write();

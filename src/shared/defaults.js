@@ -20,7 +20,32 @@
     subtitleMode: "translated",
     subtitleSize: 22,
     hideNativeCaptions: true,
+    // Video không có phụ đề: tự chép lời (nhận dạng giọng nói) rồi lồng tiếng.
+    asrEnabled: true,
+    asrEngine: "chrome",
+    asrLang: "en-US",
+    liveMode: "consecutive",
+    whisperProvider: "groq",
   });
+
+  // Ngôn ngữ nói trong video (mã BCP-47 cho bộ nhận dạng giọng nói).
+  LTV.SPEECH_LANGUAGES = [
+    ["en-US", "English"],
+    ["vi-VN", "Tiếng Việt"],
+    ["zh-CN", "中文"],
+    ["ja-JP", "日本語"],
+    ["ko-KR", "한국어"],
+    ["fr-FR", "Français"],
+    ["de-DE", "Deutsch"],
+    ["es-ES", "Español"],
+    ["ru-RU", "Русский"],
+    ["th-TH", "ไทย"],
+    ["id-ID", "Bahasa Indonesia"],
+    ["hi-IN", "हिन्दी"],
+    ["pt-BR", "Português"],
+    ["it-IT", "Italiano"],
+    ["auto", "Tự nhận diện (chỉ Whisper)"],
+  ];
 
   // Giới hạn hợp lệ cho các cài đặt dạng số.
   const NUMBER_RANGES = {
@@ -35,6 +60,10 @@
     translator: ["google", "claude"],
     voiceEngine: ["google", "system"],
     subtitleMode: ["translated", "bilingual", "original", "off"],
+    asrEngine: ["chrome", "whisper"],
+    asrLang: LTV.SPEECH_LANGUAGES.map(([code]) => code),
+    liveMode: ["consecutive", "parallel"],
+    whisperProvider: ["groq", "openai"],
   };
 
   LTV.TARGET_LANGUAGES = [

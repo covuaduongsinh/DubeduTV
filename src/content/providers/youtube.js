@@ -113,12 +113,14 @@
       if (!choice)
         throw LTV.captionError(
           "Video này không có phụ đề (kể cả phụ đề tự động) nên chưa lồng tiếng được.",
+          { noCaptions: true },
         );
       let cues = await fetchCues(withJson3(choice.track.baseUrl), ctx);
       if (cues.length === 0) cues = await cuesFromPlayer(choice.track, ctx);
       if (cues.length === 0) {
         throw LTV.captionError(
           "YouTube chưa trả phụ đề. Hãy bật CC một lần rồi bấm lồng tiếng lại.",
+          { noCaptions: true },
         );
       }
       return {

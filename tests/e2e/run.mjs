@@ -18,15 +18,27 @@ import {
   udemyPage,
   youtubePage,
 } from "./fixtures.mjs";
+import {
+  chromeAsrErrorScenario,
+  liveScenario,
+  replayScenario,
+  whisperErrorScenario,
+} from "./live-scenarios.mjs";
+import {
+  VIETNAMESE,
+  overlayText,
+  readLog,
+  waitForStatus,
+} from "./page-helpers.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const extensionDir = join(root, "dist", "long-tieng-viet-test");
-const VIETNAMESE =
-  /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
 const requests = [];
 
 function startServer() {
   const wav = silenceWav();
+  const shortWav = silenceWav(19);
+  const toneWav = silenceWav(20, 8000, true);
   const server = createServer((request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
     requests.push(url.pathname + url.search);
@@ -45,6 +57,10 @@ function startServer() {
       return send(200, "text/html", courseraPage());
     if (url.pathname === "/media/silence.wav")
       return send(200, "audio/wav", wav);
+    if (url.pathname === "/media/short.wav")
+      return send(200, "audio/wav", shortWav);
+    if (url.pathname === "/media/tone.wav")
+      return send(200, "audio/wav", toneWav);
     if (url.pathname === "/api/timedtext") {
       // Giống YouTube hiện nay: thiếu PO token thì trả rỗng.
       return send(
@@ -108,20 +124,6 @@ async function launch() {
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return { context, worker, userDataDir };
-}
-
-async function readLog(page) {
-  const raw = await page.evaluate(() =>
-    document.documentElement.getAttribute("data-ltv-test-log"),
-  );
-  return raw ? JSON.parse(raw) : [];
-}
-
-async function overlayText(page) {
-  return page.evaluate(() => {
-    const host = document.querySelector('[data-ltv="overlay"]');
-    return host?.shadowRoot?.querySelector(".main")?.textContent || "";
-  });
 }
 
 async function runSite(context, { name, path, extraChecks }) {
@@ -224,18 +226,11 @@ async function realSpeechPath(context) {
   await page.goto(`${baseUrl}/watch?v=real01&real=1`);
   await page.waitForSelector("video", { state: "attached" });
   await page.evaluate(() => document.querySelector("video").play());
-  let status = "";
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
-    status = await page.evaluate(
-      () =>
-        document
-          .querySelector('[data-ltv="overlay"]')
-          ?.shadowRoot?.querySelector(".status")?.textContent || "",
-    );
-    if (/Lỗi giọng đọc|Giọng Google không phản hồi/.test(status)) break;
-    await page.waitForTimeout(300);
-  }
+  const status = await waitForStatus(
+    page,
+    /Lỗi giọng đọc|Giọng Google không phản hồi/,
+    30000,
+  );
   const contexts = await context.serviceWorkers()[0].evaluate(
     async () =>
       (
@@ -261,23 +256,25 @@ async function optionsPage(context) {
   const id = new URL(context.serviceWorkers()[0].url()).host;
   const page = await context.newPage();
   await page.goto(`chrome-extension://${id}/options/options.html`);
-  const stats = page.locator("#cache-stats");
   await page.waitForFunction(
-    () => !/Đang đọc/.test(document.querySelector("#cache-stats").textContent),
+    () =>
+      !/Đang đọc/.test(document.querySelector("#cache-stats").textContent) &&
+      !/Đang đọc/.test(document.querySelector("#transcript-stats").textContent),
     null,
-    {
-      timeout: 10000,
-    },
+    { timeout: 10000 },
   );
-  const text = await stats.textContent();
+  const cache = await page.locator("#cache-stats").textContent();
+  const transcripts = await page.locator("#transcript-stats").textContent();
   await page.close();
-  const failures = /Đang lưu bản dịch của [1-9]\d* video/.test(text)
-    ? []
-    : [`thống kê cache sai: "${text}"`];
+  const failures = [];
+  if (!/Đang lưu bản dịch của [1-9]\d* video/.test(cache))
+    failures.push(`thống kê cache sai: "${cache}"`);
+  if (!/Đang lưu lời chép của [1-9]\d* video/.test(transcripts))
+    failures.push(`thống kê lời chép sai: "${transcripts}"`);
   return {
-    name: "Trang tuỳ chọn đọc bộ nhớ đệm bản dịch",
+    name: "Trang tuỳ chọn đọc bộ nhớ đệm và lời chép",
     failures,
-    spoken: [text],
+    spoken: [cache, transcripts],
   };
 }
 
@@ -313,6 +310,21 @@ async function main() {
         path: `${baseUrl}/coursera/learn/demo/lecture/abc123`,
       }),
       await realSpeechPath(context),
+      await liveScenario(context, {
+        baseUrl,
+        worker,
+        videoId: "nosub01",
+        liveMode: "consecutive",
+      }),
+      await liveScenario(context, {
+        baseUrl,
+        worker,
+        videoId: "nosub02",
+        liveMode: "parallel",
+      }),
+      await replayScenario(context, { baseUrl, videoId: "nosub01" }),
+      await whisperErrorScenario(context, { baseUrl, worker }),
+      await chromeAsrErrorScenario(context, { baseUrl }),
       await optionsPage(context),
     );
   } finally {

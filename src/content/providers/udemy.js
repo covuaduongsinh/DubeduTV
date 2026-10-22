@@ -109,6 +109,7 @@
       if (fallback) return { ...fallback, title: document.title };
       throw LTV.captionError(
         "Chưa lấy được phụ đề Udemy. Hãy bật phụ đề (CC) trong trình phát rồi bấm lồng tiếng lại.",
+        { noCaptions: true },
       );
     },
   });
