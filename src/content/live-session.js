@@ -108,12 +108,29 @@
       isStopped: () => stopped,
       push: (sentence) => parts.dubber.push(sentence),
     });
+    // Song song: đọc từng cụm ngắn ngay khi nghe được (kết quả tạm).
+    const cutter = LTV.createPhraseCutter({
+      onPhrase: (phrase) => pipeline.enqueue(phrase),
+      now: () => video.currentTime,
+    });
+    const resetCutter = () => cutter.reset();
+
+    function handleInterim(result) {
+      if (stopped || isSuspended() || getSettings().liveMode !== "parallel")
+        return;
+      cutter.interim(result);
+    }
 
     function handleSegment(segment) {
       if (stopped || isSuspended()) return;
-      saver.add(segment);
-      for (const sentence of LTV.segment.buildSentences([segment]))
-        pipeline.enqueue(sentence);
+      const { start, end, text } = segment;
+      saver.add({ start, end, text });
+      if (segment.key && cutter.has(segment.key)) cutter.final(segment);
+      else
+        for (const sentence of LTV.segment.buildSentences([
+          { start, end, text },
+        ]))
+          pipeline.enqueue(sentence);
       heard += 1;
       setStatus("live", `Đang nghe & lồng tiếng • đã chép ${heard} câu`);
     }
@@ -148,10 +165,12 @@
         if (stopped) return;
         createParts(settings);
         parts.dubber.start();
+        video.addEventListener("seeking", resetCutter);
         await parts.recognizer.start({
           track: parts.track,
           lang,
           onSegment: handleSegment,
+          onInterim: handleInterim,
           onError: handleError,
         });
         setStatus("live", listeningMessage(engine), { sticky: true });
@@ -159,6 +178,8 @@
       stop() {
         if (stopped) return;
         stopped = true;
+        video.removeEventListener("seeking", resetCutter);
+        cutter.reset();
         parts.recognizer?.stop();
         parts.dubber?.stop();
         parts.speech?.dispose();

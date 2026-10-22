@@ -9,6 +9,8 @@
 
   const MAX_BEHIND_SECONDS = 15;
   const BACKLOG_BOOST = 0.15;
+  // Song song: chờ quá ngần này câu thì bỏ câu cũ nhất để không trễ mãi.
+  const MAX_PARALLEL_QUEUE = 3;
 
   const realClock = {
     setTimeout: (fn, ms) => setTimeout(fn, ms),
@@ -146,6 +148,8 @@
       },
       push(sentence) {
         if (!running || !sentence?.tr) return;
+        if (getSettings().liveMode === "parallel")
+          while (queue.length >= MAX_PARALLEL_QUEUE) queue.shift();
         queue.push(sentence);
         speakNext();
       },

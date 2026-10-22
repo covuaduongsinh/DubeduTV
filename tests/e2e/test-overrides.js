@@ -35,17 +35,42 @@
     if (realAsr()) return createRealRecognizer(deps);
     const source = document.getElementById("ltv-test-transcript");
     const pending = JSON.parse(source?.textContent || "[]");
+    // data-ltv-test-interim="1": phát thêm kết quả tạm (từng từ) như Chrome.
+    const interim = document.documentElement.dataset.ltvTestInterim === "1";
     let timer = null;
+    let index = 0;
+
+    function emitInterim(onInterim) {
+      const current = pending[0];
+      const time = deps.video.currentTime;
+      if (!interim || !onInterim || !current || time < current.start) return;
+      const words = current.text.split(" ");
+      const share = Math.min(
+        1,
+        (time - current.start) / (current.end - current.start),
+      );
+      onInterim({
+        key: `test:${index}`,
+        text: words
+          .slice(0, Math.max(1, Math.ceil(words.length * share)))
+          .join(" "),
+        firstHeard: current.start + 0.8,
+      });
+    }
+
     return {
       engine: "chrome",
-      async start({ onSegment }) {
+      async start({ onSegment, onInterim }) {
         timer = setInterval(() => {
           while (
             pending.length > 0 &&
             pending[0].end + 0.4 <= deps.video.currentTime
           ) {
-            onSegment(pending.shift());
+            const segment = pending.shift();
+            onSegment(interim ? { ...segment, key: `test:${index}` } : segment);
+            index += 1;
           }
+          emitInterim(onInterim);
         }, 100);
       },
       stop: () => clearInterval(timer),

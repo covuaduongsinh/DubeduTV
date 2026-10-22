@@ -2,7 +2,7 @@
 // vì Chromium thử nghiệm không có dịch vụ nhận dạng của Google) → dịch thật →
 // đọc theo hai chế độ → lưu lời chép → xem lại khớp thời gian; cùng các đường
 // lỗi thật của bộ nhận dạng Chrome và Whisper.
-import { LESSON } from "./fixtures.mjs";
+import { LESSON, LONG_LESSON } from "./fixtures.mjs";
 import {
   VIETNAMESE,
   checker,
@@ -115,6 +115,38 @@ export async function liveScenario(
 }
 
 // Xem lại video đã chép lời: dùng lời chép như phụ đề, đọc khớp thời gian.
+// Song song + kết quả tạm: đọc từng cụm ngắn ngay khi nghe, không chờ hết câu.
+export async function interimScenario(context, { baseUrl, worker }) {
+  await worker.evaluate(() =>
+    chrome.storage.sync.set({ liveMode: "parallel", asrEngine: "chrome" }),
+  );
+  const page = await openVideo(
+    context,
+    `${baseUrl}/watch?v=nosub03&nosub=1&interim=1`,
+  );
+  const { failures, check } = checker();
+  const { done } = await waitForSpoken(page, 5, 40000);
+  check(done.length >= 4, `chỉ đọc ${done.length} cụm (cần ≥ 4 từ 2 câu)`);
+  check(
+    done.length > 0 && done[0].at < LONG_LESSON[0][1],
+    `cụm đầu đọc lúc ${done[0]?.at}s, không sớm hơn lúc nói xong câu (${LONG_LESSON[0][1]}s)`,
+  );
+  check(
+    done.every((entry) => VIETNAMESE.test(entry.text)),
+    "có cụm không phải tiếng Việt",
+  );
+  check(
+    done.every((entry, i) => i === 0 || entry.at >= done[i - 1].at),
+    "thứ tự đọc không tăng dần",
+  );
+  await page.close();
+  return {
+    name: "Nghe trực tiếp song song – đọc từng cụm ngay khi nghe",
+    failures,
+    spoken: describe(done),
+  };
+}
+
 export async function replayScenario(context, { baseUrl, videoId }) {
   const page = await openVideo(
     context,

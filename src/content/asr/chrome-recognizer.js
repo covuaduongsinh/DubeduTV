@@ -54,6 +54,38 @@
     }
   }
 
+  // Phát kết quả của một sự kiện onresult. Mỗi lượt nói có khoá riêng
+  // (lần khởi động + chỉ số kết quả) để bộ cắt cụm ghép tạm với cuối.
+  function emitResults(event, { video, firstHeard, epoch, handlers }) {
+    let finals = 0;
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      if (!firstHeard.has(i)) firstHeard.set(i, video.currentTime);
+      const text = String(result[0]?.transcript || "").trim();
+      const key = `${epoch}:${i}`;
+      if (!result.isFinal) {
+        if (text)
+          handlers.onInterim?.({ key, text, firstHeard: firstHeard.get(i) });
+        continue;
+      }
+      const timing = LTV.asrTiming({
+        firstHeard: firstHeard.get(i),
+        finalAt: video.currentTime,
+        rate: video.playbackRate,
+      });
+      finals += 1;
+      if (text)
+        handlers.onSegment({
+          ...timing,
+          text,
+          key,
+          firstHeard: firstHeard.get(i),
+        });
+      firstHeard.delete(i);
+    }
+    return finals;
+  }
+
   LTV.createChromeRecognizer = function createChromeRecognizer({ video }) {
     let recognition = null;
     let running = false;
@@ -62,25 +94,11 @@
     let restartTimer = null;
     let handlers = null;
     let firstHeard = new Map();
+    let epoch = 0;
 
     function handleResult(event) {
-      for (let i = event.resultIndex; i < event.results.length; i += 1) {
-        const result = event.results[i];
-        if (!firstHeard.has(i)) firstHeard.set(i, video.currentTime);
-        const text = String(result[0]?.transcript || "").trim();
-        if (!result.isFinal) {
-          handlers.onInterim?.(text);
-          continue;
-        }
-        const timing = LTV.asrTiming({
-          firstHeard: firstHeard.get(i),
-          finalAt: video.currentTime,
-          rate: video.playbackRate,
-        });
-        firstHeard.delete(i);
-        networkErrors = 0;
-        if (text) handlers.onSegment({ ...timing, text });
-      }
+      const context = { video, firstHeard, epoch, handlers };
+      if (emitResults(event, context) > 0) networkErrors = 0;
     }
 
     function handleError(event) {
@@ -123,6 +141,7 @@
       recognition.maxAlternatives = 1;
       if (local) recognition.processLocally = true;
       firstHeard = new Map();
+      epoch += 1;
       recognition.onresult = handleResult;
       recognition.onerror = handleError;
       recognition.onend = handleEnd;

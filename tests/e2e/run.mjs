@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
 import {
   chromeAsrErrorScenario,
+  interimScenario,
   liveScenario,
   replayScenario,
   whisperErrorScenario,
@@ -162,6 +163,7 @@ function selectScenarios(context, worker) {
     youtube: youtubeVariants(context, baseUrl),
     frames: frameScenarios(context, { baseUrl, worker }),
     addons: addonScenarios(context, { baseUrl, worker }),
+    live: [() => interimScenario(context, { baseUrl, worker })],
   };
   const wanted = (process.env.LTV_E2E_GROUPS || Object.keys(groups).join(","))
     .split(",")

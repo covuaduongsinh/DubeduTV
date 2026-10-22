@@ -1,5 +1,19 @@
 // Trang giả lập ba site, phụ đề mẫu và âm thanh im lặng cho kiểm thử e2e.
 
+// Lời nói dài cho kịch bản cắt cụm sớm (nghe trực tiếp, chế độ song song).
+export const LONG_LESSON = [
+  [
+    0.5,
+    6.0,
+    "Welcome back to this chess lesson, and today we will learn how the knight moves on the board.",
+  ],
+  [
+    7.0,
+    12.0,
+    "The knight jumps in an L shape because it can leap over other pieces when it moves.",
+  ],
+];
+
 export const LESSON = [
   [0.5, 3.0, "Welcome to this short chess lesson."],
   [3.2, 6.0, "Today we will learn how the knight moves."],
@@ -100,7 +114,13 @@ export function youtubePage({ layout = "watch" } = {}) {
     `const params = new URL(location.href).searchParams;
     if (params.get("real") === "1") document.documentElement.dataset.ltvRealSpeech = "1";
     if (params.get("realasr") === "1") document.documentElement.dataset.ltvRealAsr = "1";
-    if (params.get("interim") === "1") document.documentElement.dataset.ltvTestInterim = "1";
+    if (params.get("interim") === "1") {
+      // Câu dài có dấu phẩy/liên từ để bộ cắt cụm đọc sớm.
+      document.documentElement.dataset.ltvTestInterim = "1";
+      document.getElementById("ltv-test-transcript").textContent = JSON.stringify(${JSON.stringify(
+        LONG_LESSON.map(([start, end, text]) => ({ start, end, text })),
+      )});
+    }
     // nosub=1: video không có phụ đề (phát âm thanh ngắn 19 giây); tone=1: có tiếng tone.
     const noSubtitles = params.get("nosub") === "1";
     if (noSubtitles) {
