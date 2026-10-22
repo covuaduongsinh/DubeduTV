@@ -1,5 +1,7 @@
 // Hàng đợi dịch: ưu tiên các câu quanh vị trí đang xem (lô đầu nhỏ để bắt đầu
-// đọc sau vài giây), sau đó dịch dần phần còn lại. Bản dịch lưu cache theo video.
+// đọc sau vài giây), sau đó dịch dần phần còn lại. Bản dịch lưu cache theo
+// video và theo bộ dịch thật đã dịch câu đó (Google dự phòng không bị lưu
+// thành bản dịch Claude); khi mở lại chỉ đọc cache của bộ dịch đang chọn.
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
@@ -28,21 +30,42 @@
     return batch;
   }
 
-  // Gán bản dịch vào câu; trả về các mục mới để lưu cache { hash: bản dịch }.
-  function applyResults(sentences, hashes, batch, results) {
+  // Gán bản dịch vào câu; trả về các mục mới để lưu cache, nhóm theo bộ dịch
+  // { engine: { hash: bản dịch } }.
+  function applyResults(sentences, hashes, batch, response) {
     const fresh = {};
-    (results || []).forEach((result, k) => {
+    (response.results || []).forEach((result, k) => {
       const index = batch[k];
       if (index === undefined || typeof result !== "string" || !result.trim())
         return;
       sentences[index].tr = result.trim();
-      fresh[hashes[index]] = sentences[index].tr;
+      const engine = response.engines?.[k];
+      if (!engine) return;
+      fresh[engine] = fresh[engine] || {};
+      fresh[engine][hashes[index]] = sentences[index].tr;
     });
     return fresh;
   }
 
+  async function readCache(connection, key) {
+    try {
+      const response = await connection.request(
+        { type: "cache:get", key },
+        15000,
+      );
+      return response.items || {};
+    } catch {
+      return {}; // Không có cache vẫn dịch bình thường.
+    }
+  }
+
+  function saveFresh(connection, cacheKeyFor, fresh) {
+    for (const [engine, items] of Object.entries(fresh))
+      connection.post({ type: "cache:put", key: cacheKeyFor(engine), items });
+  }
+
   LTV.createTranslationQueue = function createTranslationQueue(options) {
-    const { sentences, connection, cacheKey, sl, tl, title, getSettings } =
+    const { sentences, connection, cacheKeyFor, engine, sl, tl, title } =
       options;
     const onProgress = options.onProgress || (() => {});
     const onWarning = options.onWarning || (() => {});
@@ -82,13 +105,16 @@
           sl,
           tl,
           title,
-          engine: getSettings().translator,
+          engine,
         });
         if (cancelled) return;
-        const fresh = applyResults(sentences, hashes, batch, response.results);
-        const applied = Object.keys(fresh).length;
-        if (applied > 0)
-          connection.post({ type: "cache:put", key: cacheKey, items: fresh });
+        const done = doneCount();
+        saveFresh(
+          connection,
+          cacheKeyFor,
+          applyResults(sentences, hashes, batch, response),
+        );
+        const applied = doneCount() - done;
         if (response.warning) onWarning(response.warning);
         if (response.error && applied === 0) throw new Error(response.error);
         failures = 0;
@@ -118,19 +144,11 @@
 
     return {
       async loadCache() {
-        try {
-          const response = await connection.request(
-            { type: "cache:get", key: cacheKey },
-            15000,
-          );
-          const items = response.items || {};
-          sentences.forEach((sentence, index) => {
-            if (!sentence.tr && items[hashes[index]])
-              sentence.tr = items[hashes[index]];
-          });
-        } catch {
-          // Không có cache vẫn dịch bình thường.
-        }
+        const items = await readCache(connection, cacheKeyFor(engine));
+        sentences.forEach((sentence, index) => {
+          if (!sentence.tr && items[hashes[index]])
+            sentence.tr = items[hashes[index]];
+        });
         onProgress(doneCount(), sentences.length);
       },
       ensureFrom(index) {

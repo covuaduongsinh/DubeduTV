@@ -5,7 +5,8 @@
   const LTV = (root.LTV = root.LTV || {});
 
   LTV.DEFAULTS = Object.freeze({
-    autoStart: false,
+    // Tự bật lồng tiếng khi mở video: "off" | "cached" (chỉ video đã lồng) | "always".
+    autoStart: "off",
     targetLang: "vi",
     sourceLang: "auto",
     translator: "google",
@@ -26,6 +27,9 @@
     asrLang: "en-US",
     liveMode: "consecutive",
     whisperProvider: "groq",
+    // Nút "Dịch" câu hỏi trắc nghiệm (Coursera/Udemy) và huy hiệu "Đã lồng".
+    quizTranslate: true,
+    showBadges: true,
   });
 
   // Ngôn ngữ nói trong video (mã BCP-47 cho bộ nhận dạng giọng nói).
@@ -57,6 +61,7 @@
   };
 
   const ENUMS = {
+    autoStart: ["off", "cached", "always"],
     translator: ["google", "claude"],
     voiceEngine: ["google", "system"],
     subtitleMode: ["translated", "bilingual", "original", "off"],
@@ -90,8 +95,15 @@
     ["claude-haiku-5-5", "Claude Haiku 5.5 – nhanh, rẻ nhất"],
   ];
 
-  function validValue(key, value) {
+  // Giá trị kiểu cũ còn lưu trong storage (v1.1: autoStart là true/false).
+  const LEGACY = {
+    autoStart: (value) =>
+      typeof value === "boolean" ? (value ? "always" : "off") : value,
+  };
+
+  function validValue(key, stored) {
     const fallback = LTV.DEFAULTS[key];
+    const value = LEGACY[key] ? LEGACY[key](stored) : stored;
     if (typeof value !== typeof fallback) return fallback;
     if (typeof value === "number") {
       const range = NUMBER_RANGES[key];
@@ -109,6 +121,21 @@
       result[key] = validValue(key, stored ? stored[key] : undefined);
     }
     return result;
+  };
+
+  // Khoá cache bản dịch "<phiên>:<ngôn ngữ phụ đề>:<ngôn ngữ đích>:<bộ dịch>".
+  // Mã phiên có thể chứa ":" nên tách từ bên phải.
+  LTV.cacheKey = function cacheKey({ session, lang, tl, engine }) {
+    return `${session}:${lang}:${tl}:${engine}`;
+  };
+
+  LTV.parseCacheKey = function parseCacheKey(key) {
+    const parts = String(key || "").split(":");
+    if (parts.length < 4) return null;
+    const engine = parts.pop();
+    const tl = parts.pop();
+    const lang = parts.pop();
+    return { session: parts.join(":"), lang, tl, engine };
   };
 
   // Mã ngôn ngữ gốc: "en-US" → "en", "zh-CN" giữ nguyên vì Google phân biệt.

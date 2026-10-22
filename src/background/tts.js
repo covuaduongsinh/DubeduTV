@@ -3,34 +3,10 @@
 //   "google" – MP3 từ Google Dịch, phát trong offscreen document.
 // Mỗi câu nhận đúng một sự kiện kết thúc: end | interrupted | error.
 
-const OFFSCREEN_URL = "offscreen/offscreen.html";
-
 function clamp(value, min, max) {
   const number = Number(value);
   if (!Number.isFinite(number)) return min;
   return Math.min(max, Math.max(min, number));
-}
-
-let creatingOffscreen = null;
-
-// Tạo offscreen document (một lần) để phát âm thanh giọng Google.
-async function ensureOffscreen(runtime) {
-  const contexts = await runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-  });
-  if (contexts.length > 0) return;
-  if (!creatingOffscreen) {
-    creatingOffscreen = chrome.offscreen
-      .createDocument({
-        url: OFFSCREEN_URL,
-        reasons: ["AUDIO_PLAYBACK"],
-        justification: "Phát giọng đọc lồng tiếng cho video",
-      })
-      .finally(() => {
-        creatingOffscreen = null;
-      });
-  }
-  await creatingOffscreen;
 }
 
 const TTS_EVENTS = {
@@ -61,6 +37,7 @@ function speakSystem({ tts, runtime }, utterance, report) {
 
 export function createSpeech({
   emit,
+  ensureOffscreen,
   tts = chrome.tts,
   runtime = chrome.runtime,
 }) {
@@ -81,7 +58,7 @@ export function createSpeech({
   }
 
   async function speakGoogle(utterance) {
-    await ensureOffscreen(runtime);
+    await ensureOffscreen();
     await runtime.sendMessage({
       target: "offscreen",
       type: "play",
@@ -132,7 +109,7 @@ export function createSpeech({
 
   async function prefetch(texts, lang) {
     if (!Array.isArray(texts) || texts.length === 0) return;
-    await ensureOffscreen(runtime);
+    await ensureOffscreen();
     await runtime.sendMessage({
       target: "offscreen",
       type: "prefetch",

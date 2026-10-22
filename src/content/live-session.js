@@ -8,7 +8,6 @@
   const SAVE_DELAY_MS = 4000;
   const NO_ENGINE_MESSAGE =
     "Video không có phụ đề. Để tự chép lời, hãy dùng Google Chrome 139+ hoặc nhập API key Whisper trong Tuỳ chọn.";
-  const CONTEXT_LINES = 3;
 
   // Lấy audio track của video; trả lỗi dễ hiểu khi trang chặn thu âm.
   async function captureAudioTrack(video, signal) {
@@ -73,25 +72,6 @@
     };
   }
 
-  // Dịch một câu vừa chép, kèm vài câu trước làm ngữ cảnh.
-  async function translateLive(
-    { connection, settings, lang, title, recent },
-    text,
-  ) {
-    const tl = settings.targetLang;
-    if (LTV.tracks.sameLang(lang, tl)) return { text };
-    const response = await connection.request({
-      type: "translate",
-      texts: [text],
-      context: recent.slice(-CONTEXT_LINES),
-      sl: lang === "auto" ? "auto" : LTV.baseLang(lang),
-      tl,
-      title,
-      engine: settings.translator,
-    });
-    return { text: response.results?.[0] || null, warning: response.warning };
-  }
-
   function listeningMessage(engine) {
     const label = engine === "whisper" ? "Whisper" : "Chrome";
     return `Video không có phụ đề – đang nghe và chép lời (${label})…`;
@@ -107,9 +87,7 @@
     const { sessionId, video, connection, getSettings, title } = options;
     const setStatus = options.setStatus || (() => {});
     const isSuspended = options.isSuspended || (() => false);
-    const recent = [];
     const parts = { recognizer: null, dubber: null, speech: null, track: null };
-    let translating = Promise.resolve();
     let stopped = false;
     let heard = 0;
     let lang = "en-US";
@@ -121,31 +99,21 @@
       meta: () => ({ lang, engine }),
     });
 
-    async function deliver(sentence) {
-      const context = {
-        connection,
-        settings: getSettings(),
-        lang,
-        title,
-        recent,
-      };
-      const result = await translateLive(context, sentence.text);
-      recent.push(sentence.text);
-      if (result.warning) setStatus("warn", result.warning, { tone: "warn" });
-      if (result.text && !stopped)
-        parts.dubber.push({ ...sentence, tr: result.text });
-    }
+    const pipeline = LTV.createLivePipeline({
+      connection,
+      getSettings,
+      title,
+      getLang: () => lang,
+      setStatus,
+      isStopped: () => stopped,
+      push: (sentence) => parts.dubber.push(sentence),
+    });
 
     function handleSegment(segment) {
       if (stopped || isSuspended()) return;
       saver.add(segment);
-      for (const sentence of LTV.segment.buildSentences([segment])) {
-        translating = translating
-          .then(() => deliver(sentence))
-          .catch((error) =>
-            setStatus("error", `Lỗi dịch: ${error.message}`, { tone: "error" }),
-          );
-      }
+      for (const sentence of LTV.segment.buildSentences([segment]))
+        pipeline.enqueue(sentence);
       heard += 1;
       setStatus("live", `Đang nghe & lồng tiếng • đã chép ${heard} câu`);
     }

@@ -71,6 +71,10 @@ export function createCache({
         ...Object.keys(index).map((key) => PREFIX + key),
       ]);
     },
+    // Khoá các video đang có bản dịch (kể cả mục chưa kịp ghi).
+    async keys() {
+      return [...new Set([...Object.keys(await readIndex()), ...dirty.keys()])];
+    },
     async stats() {
       const index = await readIndex();
       const bytes = storage.getBytesInUse

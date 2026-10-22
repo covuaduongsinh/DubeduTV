@@ -96,6 +96,9 @@ export function createTranscriptStore({ storage, max = MAX_TRANSCRIPTS }) {
         ...Object.keys(index).map((key) => PREFIX + key),
       ]);
     },
+    async keys() {
+      return Object.keys(await readIndex());
+    },
     async count() {
       return Object.keys(await readIndex()).length;
     },

@@ -5,7 +5,6 @@
   if (LTV.contentLoaded) return;
   LTV.contentLoaded = true;
 
-  const ACTIVE_KEY = "ltv-active";
   const NAV_POLL_MS = 800;
   const RESTART_KEYS = [
     "targetLang",
@@ -16,31 +15,26 @@
     "asrEngine",
     "asrLang",
   ];
-  // Lời chép đã lưu phủ ít nhất ngần này thời lượng thì dùng như phụ đề.
-  const TRANSCRIPT_MIN_COVERAGE = 0.9;
-
   const connection = LTV.createConnection();
   const bridge = LTV.bridge;
+  const isTop = window === window.top;
   const state = {
     settings: LTV.mergeSettings({}),
+    // active: người dùng (hoặc autoStart "always") bật cho cả thẻ;
+    // autoFor: phiên được tự bật riêng (chế độ "cached" hoặc video nhúng).
     active: false,
+    autoFor: null,
+    autoPending: null,
+    userChoice: null,
     forced: false,
-    engineOverride: null,
     session: null,
     status: { state: "idle", message: "" },
     ui: { video: null, overlay: null, button: null },
   };
-  let speechErrors = 0;
-
-  function effectiveSettings() {
-    // engineOverride: tên giọng máy dùng tạm khi giọng Google không phản hồi.
-    if (!state.engineOverride) return state.settings;
-    return {
-      ...state.settings,
-      voiceEngine: "system",
-      systemVoice: state.engineOverride,
-    };
-  }
+  const getSettings = () => state.settings;
+  const voice = LTV.createVoiceFallback({ connection, getSettings, setStatus });
+  const effectiveSettings = voice.effectiveSettings;
+  const auto = LTV.createAutoStart({ connection, getSettings, isTop });
 
   function pickProvider() {
     if (typeof LTV.pickProvider === "function")
@@ -52,23 +46,9 @@
       : null;
   }
 
-  function readActive() {
-    try {
-      const stored = sessionStorage.getItem(ACTIVE_KEY);
-      if (stored === "1" || stored === "0") return stored === "1";
-    } catch {
-      // sessionStorage có thể bị chặn.
-    }
-    return state.settings.autoStart;
-  }
-
-  function writeActive(active) {
-    try {
-      sessionStorage.setItem(ACTIVE_KEY, active ? "1" : "0");
-    } catch {
-      // Bỏ qua.
-    }
-  }
+  const sessionIdFor = (provider, key) =>
+    provider && key ? `${provider.id}:${key}` : null;
+  const isOn = (id) => Boolean(id) && (state.active || state.autoFor === id);
 
   function setStatus(
     name,
@@ -102,8 +82,9 @@
       ui.button?.destroy();
       ui.button = LTV.createPlayerButton(bar, () => toggle());
     }
-    ui.overlay.setActive(state.active);
-    ui.button?.setActive(state.active);
+    const on = isOn(state.session?.id);
+    ui.overlay.setActive(on);
+    ui.button?.setActive(on);
     return video;
   }
 
@@ -140,51 +121,22 @@
     return lang && lang !== "und" ? LTV.baseLang(lang) : "auto";
   }
 
-  async function handleSpeechResult(result) {
-    if (result.ok || result.event === "interrupted") {
-      if (result.ok) speechErrors = 0;
-      return;
-    }
-    speechErrors += 1;
-    const settings = effectiveSettings();
-    if (speechErrors >= 2 && settings.voiceEngine === "google") {
-      const voice = await findSystemVoice(state.settings.targetLang);
-      if (voice) {
-        state.engineOverride = voice;
-        speechErrors = 0;
-        setStatus(
-          "warn",
-          `Giọng Google không phản hồi – tạm dùng giọng máy “${voice}”.`,
-          { tone: "warn" },
-        );
-        return;
-      }
-    }
-    if (speechErrors >= 2)
-      setStatus("error", `Lỗi giọng đọc: ${result.message || result.event}`, {
-        tone: "error",
-      });
-  }
-
-  async function findSystemVoice(lang) {
-    try {
-      const response = await connection.request({ type: "voices", lang }, 5000);
-      return response.voice || null;
-    } catch {
-      return null;
-    }
-  }
-
   function createQueue(session, captions, sl) {
     const tl = state.settings.targetLang;
     return LTV.createTranslationQueue({
       sentences: session.sentences,
       connection,
-      cacheKey: `${session.id}:${captions.lang}:${tl}:${state.settings.translator}`,
+      engine: state.settings.translator,
+      cacheKeyFor: (engine) =>
+        LTV.cacheKey({
+          session: captions.cacheId || session.id,
+          lang: captions.lang,
+          tl,
+          engine,
+        }),
       sl,
       tl,
       title: captions.title || document.title,
-      getSettings: () => state.settings,
       onProgress: (done, total) => {
         session.progress = { done, total };
       },
@@ -194,31 +146,6 @@
           setStatus("error", `Lỗi dịch: ${message}`, { tone: "error" });
       },
     });
-  }
-
-  // Lời chép từ lần xem trước, nếu phủ gần hết video thì dùng như phụ đề.
-  async function savedTranscript(session) {
-    let entry = null;
-    try {
-      const response = await connection.request(
-        { type: "transcript:get", key: session.id },
-        10000,
-      );
-      entry = response.entry;
-    } catch {
-      entry = null;
-    }
-    if (!entry || !(entry.coverage >= TRANSCRIPT_MIN_COVERAGE)) return null;
-    return {
-      cues: entry.cues,
-      lang: entry.lang,
-      needsTranslation: !LTV.tracks.sameLang(
-        entry.lang,
-        state.settings.targetLang,
-      ),
-      label: "lời chép tự động đã lưu",
-      title: document.title,
-    };
   }
 
   async function startLive(session, video) {
@@ -233,14 +160,14 @@
       connection,
       signal: session.signal,
       title: document.title,
-      getSettings: () => state.settings,
+      getSettings,
       effectiveSettings,
       isSuspended: () => Boolean(session.provider.isSuspended?.()),
       makeSpeech: () =>
         LTV.createSpeechClient({ connection, getSettings: effectiveSettings }),
       setStatus,
       onLine: (sentence) => state.ui.overlay?.setLine(sentence),
-      onSpeechResult: handleSpeechResult,
+      onSpeechResult: voice.handle,
     });
     await session.live.start();
   }
@@ -267,7 +194,11 @@
       captions = await provider.loadCaptions(ctx);
     } catch (error) {
       if (!error.noCaptions || signal.aborted) throw error;
-      captions = await savedTranscript(session);
+      captions = await LTV.loadSavedTranscript({
+        connection,
+        key: session.id,
+        targetLang: state.settings.targetLang,
+      });
       if (!captions) {
         // Không có phụ đề: startSession chuyển sang tự chép lời.
         session.noCaptions = error;
@@ -304,7 +235,7 @@
       progress: { done: 0, total: 0 },
     };
     state.session = session;
-    speechErrors = 0;
+    voice.resetErrors();
     try {
       const video = await prepareSession(session);
       if (!video || session.signal.aborted) return;
@@ -327,7 +258,7 @@
         isSuspended: () => Boolean(provider.isSuspended?.()),
         ensureTranslated: (index) => session.queue?.ensureFrom(index),
         onLine: (sentence) => state.ui.overlay?.setLine(sentence),
-        onSpeechResult: handleSpeechResult,
+        onSpeechResult: voice.handle,
       });
       session.queue?.ensureFrom(0);
       session.dubber.start();
@@ -344,19 +275,38 @@
     }
   }
 
+  function currentId() {
+    const provider = pickProvider();
+    return sessionIdFor(provider, provider?.videoKey(location));
+  }
+
+  // Tự bật theo cài đặt autoStart khi người dùng chưa tự bật/tắt trong thẻ.
+  async function maybeAutoStart(provider, id) {
+    if (state.userChoice !== null || state.autoPending?.id === id) return;
+    state.autoPending?.controller.abort();
+    const pending = { id, controller: new AbortController() };
+    state.autoPending = pending;
+    const { signal } = pending.controller;
+    const video = await LTV.util.waitFor(() => provider.findVideo(), {
+      timeout: 15000,
+      signal,
+    });
+    const decided =
+      Boolean(video) && (await auto.decide({ sessionId: id, video, signal }));
+    if (state.autoPending !== pending) return;
+    state.autoPending = null;
+    if (!decided || isOn(id) || currentId() !== id) return;
+    state.autoFor = id;
+    evaluate(true);
+  }
+
   function evaluate(restart = false) {
     const provider = pickProvider();
     const key = provider ? provider.videoKey(location) : null;
-    const id = provider && key ? `${provider.id}:${key}` : null;
+    const id = sessionIdFor(provider, key);
     const current = state.session;
     const videoGone = current?.video && !current.video.isConnected;
-    if (
-      !restart &&
-      current &&
-      current.id === id &&
-      state.active &&
-      !videoGone
-    ) {
+    if (!restart && current && current.id === id && isOn(id) && !videoGone) {
       ensureUi(provider);
       return;
     }
@@ -368,19 +318,25 @@
       );
       return;
     }
-    if (state.active) {
+    if (isOn(id)) {
       startSession(provider, key);
     } else {
       ensureUi(provider);
       setStatus("idle", "");
+      maybeAutoStart(provider, id);
     }
   }
 
   function toggle(force) {
-    state.active = force === true ? true : !state.active;
-    writeActive(state.active);
-    state.engineOverride = null;
-    if (state.active) {
+    const on = force === true ? true : !isOn(currentId());
+    state.active = on;
+    state.autoFor = null;
+    state.autoPending?.controller.abort();
+    state.autoPending = null;
+    state.userChoice = on;
+    auto.remember(on);
+    voice.reset();
+    if (on) {
       evaluate(true);
     } else {
       stopSession();
@@ -397,14 +353,14 @@
       supported: Boolean(provider),
       provider: provider?.label || null,
       onVideo: Boolean(provider && provider.videoKey(location)),
-      active: state.active,
+      active: isOn(session?.id || currentId()),
       status: state.status,
       mode: session ? session.mode || "subtitles" : null,
       progress: session?.live
         ? session.live.progress()
         : session?.progress || null,
       sentences: session?.sentences?.length || 0,
-      engineOverride: state.engineOverride,
+      engineOverride: voice.override(),
     };
   }
 
@@ -428,7 +384,7 @@
         Object.entries(changes).map(([k, v]) => [k, v.newValue]),
       ),
     });
-    if ("voiceEngine" in changes) state.engineOverride = null;
+    if ("voiceEngine" in changes) voice.reset();
     if (state.session) {
       applyNativeCaptionStyle(state.session);
       state.ui.overlay?.refresh();
@@ -469,7 +425,9 @@
     } catch {
       state.settings = LTV.mergeSettings({});
     }
-    state.active = readActive();
+    state.userChoice = auto.explicit();
+    state.active =
+      state.userChoice ?? (state.settings.autoStart === "always" && isTop);
     chrome.storage.onChanged.addListener(onSettingsChanged);
     chrome.runtime.onMessage.addListener(onRuntimeMessage);
     watchNavigation();

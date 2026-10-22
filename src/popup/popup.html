@@ -143,10 +143,14 @@
         ><input type="checkbox" data-setting="hideNativeCaptions" /> Ẩn phụ đề
         gốc của trang khi lồng tiếng</label
       >
-      <label class="check"
-        ><input type="checkbox" data-setting="autoStart" /> Tự bật lồng tiếng
-        khi mở video</label
-      >
+      <div class="row">
+        <label for="autoStart">Tự bật khi mở video</label>
+        <select id="autoStart" data-setting="autoStart">
+          <option value="off">Không</option>
+          <option value="cached">Chỉ video đã lồng trước đây</option>
+          <option value="always">Mọi video</option>
+        </select>
+      </div>
     </section>
 
     <section class="card">

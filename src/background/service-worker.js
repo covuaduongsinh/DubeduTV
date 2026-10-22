@@ -4,20 +4,22 @@ import "../shared/defaults.js";
 import { translateGoogle } from "./translate-google.js";
 import { translateClaude } from "./translate-claude.js";
 import { createSpeech } from "./tts.js";
+import { createOffscreenDoc } from "./offscreen-doc.js";
+import { createTranslateRouter } from "./translate-router.js";
 import { createCache } from "./cache.js";
 import { createFetchGuard } from "./fetch-guard.js";
 import { testWhisperKey, transcribeWhisper } from "./transcribe-whisper.js";
 import { createTranscriptStore } from "./transcripts.js";
+import { createLibrary } from "./library.js";
 
 const LTV = globalThis.LTV;
-const MAX_TEXTS_PER_REQUEST = 200;
-const MAX_TEXT_LENGTH = 2000;
 const MAX_FETCH_BYTES = 8 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
 
 const ports = new Map();
 const cache = createCache({ storage: chrome.storage.local });
 const transcripts = createTranscriptStore({ storage: chrome.storage.local });
+const library = createLibrary({ cache, transcripts });
 const isFetchAllowed = createFetchGuard(chrome.runtime.getManifest());
 
 function safePost(port, message) {
@@ -28,68 +30,30 @@ function safePost(port, message) {
   }
 }
 
+const offscreenDoc = createOffscreenDoc();
 const speech = createSpeech({
   emit: (owner, message) => safePost(ports.get(owner), message),
+  ensureOffscreen: () => offscreenDoc.ensure(),
 });
 
 async function readSettings() {
   return LTV.mergeSettings(await chrome.storage.sync.get(null));
 }
 
-async function translateWithFallback({
-  texts,
-  sl,
-  tl,
-  title,
-  engine,
-  context,
-}) {
-  const clean = (Array.isArray(texts) ? texts : [])
-    .slice(0, MAX_TEXTS_PER_REQUEST)
-    .map((text) => String(text ?? "").slice(0, MAX_TEXT_LENGTH));
-  let results = Array.from({ length: clean.length }, () => null);
-  let used = "google";
-  let warning = "";
-  if (engine === "claude") {
-    const { claudeApiKey } = await chrome.storage.local.get("claudeApiKey");
-    const { claudeModel } = await readSettings();
-    try {
-      results = await translateClaude({
-        texts: clean,
-        sl,
-        tl,
-        title,
-        context: Array.isArray(context) ? context.slice(-3) : [],
+const translate = createTranslateRouter({
+  google: translateGoogle,
+  engines: {
+    claude: async (request) => {
+      const { claudeApiKey } = await chrome.storage.local.get("claudeApiKey");
+      const { claudeModel } = await readSettings();
+      return translateClaude({
+        ...request,
         apiKey: claudeApiKey,
         model: claudeModel,
       });
-      used = "claude";
-    } catch (error) {
-      warning = `${error.message} – tạm dùng Google Dịch`;
-    }
-  }
-  const missing = results.flatMap((result, index) => (result ? [] : [index]));
-  if (missing.length > 0) {
-    try {
-      const filled = await translateGoogle({
-        texts: missing.map((i) => clean[i]),
-        sl,
-        tl,
-      });
-      missing.forEach((index, k) => {
-        results[index] = filled[k];
-      });
-    } catch (error) {
-      return {
-        results,
-        engine: used,
-        warning,
-        error: error.message || "Lỗi dịch",
-      };
-    }
-  }
-  return { results, engine: used, warning };
-}
+    },
+  },
+});
 
 async function fetchText(url) {
   if (!isFetchAllowed(url))
@@ -154,11 +118,11 @@ async function transcribeChunk({ audio, mime, lang, prompt }) {
 const portHandlers = {
   translate: async (message) => ({
     type: "translated",
-    ...(await translateWithFallback(message)),
+    ...(await translate(message)),
   }),
-  speak: async (message, tabId) => {
+  speak: async (message, ctx) => {
     await speech.speak({
-      owner: tabId,
+      owner: ctx.owner,
       uttId: String(message.uttId),
       text: String(message.text || ""),
       lang: message.lang,
@@ -168,8 +132,8 @@ const portHandlers = {
       voiceName: message.voiceName,
     });
   },
-  stop: (message, tabId) => {
-    speech.stop(tabId);
+  stop: (message, ctx) => {
+    speech.stop(ctx.owner);
   },
   prefetch: async (message) => {
     if (message.engine === "google") {
@@ -202,50 +166,65 @@ const portHandlers = {
   "transcript:put": async (message) => {
     await transcripts.put(message.key, message);
   },
+  "library:lookup": async (message) => ({
+    type: "library",
+    ...(await library.lookup(message)),
+  }),
 };
 
-async function handlePortMessage(port, tabId, message) {
+async function handlePortMessage(port, ctx, message) {
   const handler = portHandlers[message?.type];
   if (!handler) return;
-  const reply = await handler(message, tabId);
+  const reply = await handler(message, ctx);
   if (reply && message.reqId)
     safePost(port, { ...reply, reqId: message.reqId });
 }
 
+// Mỗi frame (trang chính hoặc video nhúng) có port riêng; owner = tab:frame.
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "ltv" || !port.sender?.tab) return;
   const tabId = port.sender.tab.id;
-  ports.set(tabId, port);
+  const frameId = port.sender.frameId ?? 0;
+  const ctx = { owner: `${tabId}:${frameId}`, tabId, frameId };
+  ports.set(ctx.owner, port);
   port.onMessage.addListener((message) => {
-    handlePortMessage(port, tabId, message).catch((error) => {
+    handlePortMessage(port, ctx, message).catch((error) => {
       console.warn("[Lồng Tiếng Việt]", error);
     });
   });
   port.onDisconnect.addListener(() => {
-    if (ports.get(tabId) !== port) return;
-    ports.delete(tabId);
-    speech.stop(tabId);
+    if (ports.get(ctx.owner) !== port) return;
+    ports.delete(ctx.owner);
+    speech.stop(ctx.owner);
   });
 });
 
+// Bộ script của trang chính (không phải bộ chạy trong khung video nhúng).
 function isolatedContentFiles() {
   const scripts = chrome.runtime.getManifest().content_scripts || [];
-  const isolated = scripts.find((entry) => entry.world !== "MAIN");
-  return isolated ? isolated.js : [];
+  const main = scripts.find(
+    (entry) => entry.js.includes("content/main.js") && !entry.all_frames,
+  );
+  return main ? main.js : [];
 }
 
 // "Thử lồng tiếng trang này": nạp script vào trang chưa hỗ trợ sẵn (activeTab).
 async function injectIntoTab(tabId) {
+  const target = { tabId, frameIds: [0] };
   await chrome.scripting.executeScript({
-    target: { tabId },
+    target,
     world: "MAIN",
     files: ["content/page-hook.js"],
   });
   await chrome.scripting.executeScript({
-    target: { tabId },
+    target,
     files: isolatedContentFiles(),
   });
-  await chrome.tabs.sendMessage(tabId, { type: "ltv:toggle", force: true });
+  await chrome.tabs.sendMessage(
+    tabId,
+    { type: "ltv:toggle", force: true },
+    { frameId: 0 },
+  );
 }
 
 async function testClaude({ apiKey, model }) {
@@ -296,8 +275,10 @@ const messageHandlers = {
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.target === "background" && message.type === "speech") {
-    speech.handleOffscreenEvent(message);
+  if (message?.target === "background") {
+    // Chỉ offscreen document của tiện ích gửi sự kiện giọng đọc.
+    if (sender.url === offscreenDoc.url() && message.type === "speech")
+      speech.handleOffscreenEvent(message);
     return false;
   }
   // Chỉ trang của chính tiện ích (popup, options) được gọi các lệnh này,

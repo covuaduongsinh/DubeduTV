@@ -66,6 +66,7 @@
         "content/lib/translate-queue.js",
         "content/lib/audio-chunker.js",
         "content/lib/overlay.js",
+        "content/lib/auto-start.js",
         "content/providers/html5.js",
         "content/providers/youtube.js",
         "content/providers/udemy.js",
@@ -74,7 +75,9 @@
         "content/asr/chrome-recognizer.js",
         "content/asr/whisper-recognizer.js",
         "content/live-dubber.js",
+        "content/live-pipeline.js",
         "content/live-session.js",
+        "content/voice-fallback.js",
         "content/main.js"
       ],
       "run_at": "document_idle"
