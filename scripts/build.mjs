@@ -93,6 +93,21 @@ function patchForTests(manifest) {
   return manifest;
 }
 
+// Offscreen của bản kiểm thử: luồng âm thanh và bộ chép lời giả (nghe cả thẻ).
+function patchOffscreenForTests(path) {
+  const html = readFileSync(path, "utf8");
+  const marker = '<script src="offscreen.js"></script>';
+  if (!html.includes(marker))
+    throw new Error("offscreen.html: thiếu offscreen.js");
+  writeFileSync(
+    path,
+    html.replace(
+      marker,
+      `<script src="../test/test-offscreen.js"></script>\n    ${marker}`,
+    ),
+  );
+}
+
 // Bộ script của trang chính và của khung nhúng phải giống nhau.
 function checkBundles(manifest) {
   const bundles = manifest.content_scripts
@@ -114,10 +129,9 @@ function build() {
   checkBundles(manifest);
   if (isTest) {
     mkdirSync(join(outDir, "test"), { recursive: true });
-    cpSync(
-      join(root, "tests", "e2e", "test-overrides.js"),
-      join(outDir, "test", "test-overrides.js"),
-    );
+    for (const file of ["test-overrides.js", "test-offscreen.js"])
+      cpSync(join(root, "tests", "e2e", file), join(outDir, "test", file));
+    patchOffscreenForTests(join(outDir, "offscreen", "offscreen.html"));
     manifest = patchForTests(manifest);
   }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);

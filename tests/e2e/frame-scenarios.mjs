@@ -1,6 +1,7 @@
 // Kịch bản e2e cho video trong khung nhúng khác nguồn (YouTube nhúng, Google
 // Drive) và video X/Twitter (phụ đề HLS chia đoạn). Trang chính chạy trên
 // 127.0.0.1, khung trình phát và máy chủ media trên localhost.
+import { VIETNAMESE, checker, readLog } from "./page-helpers.mjs";
 import { requests } from "./server.mjs";
 import { runSite } from "./site-scenarios.mjs";
 
@@ -72,6 +73,63 @@ async function xChecks(page, check) {
       requests.some((r) => r.includes(part)),
       `không tải ${part} của playlist phụ đề`,
     );
+}
+
+// Nghe âm thanh cả thẻ trên trang có video nhúng khác nguồn: luồng âm thanh
+// và bộ chép lời giả trong offscreen (headless không bấm được biểu tượng
+// tiện ích để lấy luồng thật). Kiểm tra đường service worker → offscreen →
+// trang chính: dịch thật, đọc, lớp phủ cố định, dừng và dọn dẹp.
+export async function tabLiveScenario(context, { baseUrl, worker }) {
+  const { failures, check } = checker();
+  await worker.evaluate(() =>
+    chrome.storage.sync.set({ asrEngine: "chrome", asrLang: "en-US" }),
+  );
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/embed-host`);
+  await page.waitForTimeout(1500);
+  const tabId = await tabIdOf(worker, "/embed-host");
+  const control = await context.newPage();
+  await control.goto(
+    `chrome-extension://${new URL(worker.url()).host}/options/options.html`,
+  );
+  const send = (message) =>
+    control.evaluate((m) => chrome.runtime.sendMessage(m), message);
+  const started = await send({
+    type: "ltv:tabLive:start",
+    tabId,
+    streamId: "test:tone",
+  });
+  check(started?.ok, `không bắt đầu nghe cả thẻ: ${started?.error}`);
+  let log = [];
+  for (let i = 0; i < 120 && log.filter((e) => e.done).length < 3; i += 1) {
+    await page.waitForTimeout(250);
+    log = await readLog(page);
+  }
+  const done = log.filter((entry) => entry.done);
+  check(done.length >= 3, `chỉ đọc xong ${done.length}/3 câu`);
+  check(
+    done.every((entry) => VIETNAMESE.test(entry.text)),
+    "có câu không phải tiếng Việt",
+  );
+  const fixed = await page.evaluate(
+    () => document.querySelector('[data-ltv="overlay"]')?.style.position,
+  );
+  check(fixed === "fixed", `lớp phủ không cố định theo màn hình (${fixed})`);
+  await send({ type: "ltv:tabLive:stop" });
+  await page.waitForTimeout(1000);
+  const status = await send({ type: "ltv:tabLive:status", tabId });
+  const capture = await worker.evaluate(() =>
+    chrome.runtime.sendMessage({ target: "offscreen", type: "tab:status" }),
+  );
+  check(status?.active === false, "service worker vẫn ghi đang nghe");
+  check(capture?.active === false, "offscreen vẫn đang thu âm thanh thẻ");
+  await control.close();
+  await page.close();
+  return {
+    name: "Nghe âm thanh cả thẻ (video nhúng khác nguồn, luồng giả lập)",
+    failures,
+    spoken: done.map((entry) => entry.text),
+  };
 }
 
 export function frameScenarios(context, { baseUrl, worker }) {

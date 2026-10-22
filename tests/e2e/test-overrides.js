@@ -102,13 +102,17 @@
     return {
       speak({ text, rate, lang }) {
         stop();
+        // Nghe cả thẻ: trang chính có thể không có <video> (video ở khung nhúng).
         const video = document.querySelector("video");
         const entry = {
           text,
           rate,
           lang,
-          at: Math.round(video.currentTime * 100) / 100,
-          pausedAtStart: video.paused,
+          at:
+            Math.round(
+              (video ? video.currentTime : performance.now() / 1000) * 100,
+            ) / 100,
+          pausedAtStart: video ? video.paused : false,
         };
         log.push(entry);
         write();
@@ -116,7 +120,8 @@
         return new Promise((resolve) => {
           current = { entry, resolve };
           current.probe = setTimeout(() => {
-            entry.volumeDuring = Math.round(video.volume * 100) / 100;
+            if (video)
+              entry.volumeDuring = Math.round(video.volume * 100) / 100;
             write();
           }, ms / 2);
           current.timer = setTimeout(() => {

@@ -1,6 +1,7 @@
 // Offscreen document: tải giọng đọc Google Dịch (MP3) và phát bằng <audio>,
-// giữ cao độ khi tăng tốc, có cache nhỏ để đọc trước các câu sắp tới; và
-// dịch trên máy bằng Translator API của Chrome (LTV.chromeAI).
+// giữ cao độ khi tăng tốc, có cache nhỏ để đọc trước các câu sắp tới; dịch
+// trên máy bằng Translator API của Chrome (LTV.chromeAI); và nghe âm thanh
+// cả thẻ (LTV.createTabCapture).
 (function () {
   const LTV = globalThis.LTV;
   const TTS_ENDPOINT = "https://translate.google.com/translate_tts";
@@ -119,6 +120,36 @@
     }
   }
 
+  const tabCapture = LTV.createTabCapture({
+    send: (event) =>
+      chrome.runtime
+        .sendMessage({ target: "background", type: "tabLive:event", ...event })
+        .catch(() => {}),
+    // Whisper chép lời qua service worker (nơi giữ API key).
+    connection: {
+      request: (message) =>
+        chrome.runtime.sendMessage({
+          target: "background",
+          type: "offscreen:asr",
+          message,
+        }),
+    },
+  });
+
+  function tabCommand(message, sendResponse) {
+    if (message.type === "tab:start") {
+      tabCapture.start(message).then(
+        (result) => sendResponse({ ok: true, ...result }),
+        (error) => sendResponse({ ok: false, error: error?.message }),
+      );
+      return true;
+    }
+    if (message.type === "tab:status") sendResponse(tabCapture.status());
+    else if (message.type === "tab:gain") tabCapture.gain(message.value);
+    else if (message.type === "tab:stop") tabCapture.stop();
+    return false;
+  }
+
   function translate(message, sendResponse) {
     LTV.chromeAI
       .translate(message)
@@ -132,6 +163,8 @@
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.target !== "offscreen" || sender.tab) return false;
     if (message.type === "translate") return translate(message, sendResponse);
+    if (message.type?.startsWith("tab:"))
+      return tabCommand(message, sendResponse);
     if (message.type === "play") play(message);
     else if (message.type === "stop") stop();
     else if (message.type === "prefetch") {

@@ -8,11 +8,13 @@
   LTV.startAddons = function startAddons({
     connection,
     getSettings,
+    voice,
     siteId,
     isTop,
   }) {
     const parts = [];
     if (isTop) {
+      parts.push(LTV.createTabLiveHost({ connection, getSettings, voice }));
       if (LTV.driveHost?.matches(location)) LTV.driveHost.start();
       if (siteId === "youtube")
         parts.push(LTV.createBadges({ connection, getSettings }));

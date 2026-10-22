@@ -274,6 +274,7 @@
       setStatus("error", error.userMessage || `Lỗi: ${error.message}`, {
         tone: "error",
         sticky: true,
+        extra: { captureBlocked: Boolean(error.captureBlocked) },
       });
     }
   }
@@ -479,6 +480,7 @@
     addons = LTV.startAddons({
       connection,
       getSettings,
+      voice,
       siteId: pickProvider()?.id || null,
       isTop,
     });

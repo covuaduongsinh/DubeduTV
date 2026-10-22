@@ -17,7 +17,7 @@ import {
 } from "./live-scenarios.mjs";
 import { waitForStatus } from "./page-helpers.mjs";
 import { addonScenarios } from "./addon-scenarios.mjs";
-import { frameScenarios } from "./frame-scenarios.mjs";
+import { frameScenarios, tabLiveScenario } from "./frame-scenarios.mjs";
 import { startServer } from "./server.mjs";
 import {
   runSite,
@@ -163,7 +163,10 @@ function selectScenarios(context, worker) {
     youtube: youtubeVariants(context, baseUrl),
     frames: frameScenarios(context, { baseUrl, worker }),
     addons: addonScenarios(context, { baseUrl, worker }),
-    live: [() => interimScenario(context, { baseUrl, worker })],
+    live: [
+      () => interimScenario(context, { baseUrl, worker }),
+      () => tabLiveScenario(context, { baseUrl, worker }),
+    ],
   };
   const wanted = (process.env.LTV_E2E_GROUPS || Object.keys(groups).join(","))
     .split(",")

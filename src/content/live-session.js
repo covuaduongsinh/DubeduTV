@@ -16,7 +16,8 @@
       stream = (video.captureStream || video.mozCaptureStream).call(video);
     } catch {
       throw LTV.captionError(
-        "Video này chặn thu âm thanh (nguồn khác hoặc có bảo vệ bản quyền) nên chưa tự chép lời được.",
+        "Video này chặn thu âm thanh (nguồn khác hoặc có bảo vệ bản quyền) – bấm biểu tượng tiện ích rồi chọn “Nghe âm thanh cả thẻ”.",
+        { captureBlocked: true },
       );
     }
     const track = await LTV.util.waitFor(() => stream.getAudioTracks()[0], {

@@ -13,6 +13,7 @@ import { createFetchGuard } from "./fetch-guard.js";
 import { testWhisperKey, transcribeWhisper } from "./transcribe-whisper.js";
 import { createTranscriptStore } from "./transcripts.js";
 import { createLibrary } from "./library.js";
+import { createTabLive } from "./tab-live.js";
 
 const LTV = globalThis.LTV;
 const MAX_FETCH_BYTES = 8 * 1024 * 1024;
@@ -176,6 +177,12 @@ const portHandlers = {
     type: "library",
     ...(await library.lookup(message)),
   }),
+  "tabLive:gain": (message, ctx) => {
+    tabLive.gain(ctx.tabId, message.value);
+  },
+  "tabLive:stop": (message, ctx) => {
+    tabLive.stopIfTab(ctx.tabId, "Đã dừng nghe cả thẻ.");
+  },
 };
 
 async function handlePortMessage(port, ctx, message) {
@@ -202,6 +209,8 @@ chrome.runtime.onConnect.addListener((port) => {
     if (ports.get(ctx.owner) !== port) return;
     ports.delete(ctx.owner);
     speech.stop(ctx.owner);
+    // Trang chính rời đi (điều hướng, đóng thẻ): thôi nghe cả thẻ.
+    if (ctx.frameId === 0) tabLive.stopIfTab(ctx.tabId).catch(() => {});
   });
 });
 
@@ -214,8 +223,8 @@ function isolatedContentFiles() {
   return main ? main.js : [];
 }
 
-// "Thử lồng tiếng trang này": nạp script vào trang chưa hỗ trợ sẵn (activeTab).
-async function injectIntoTab(tabId) {
+// Nạp script vào trang chính của thẻ chưa hỗ trợ sẵn (activeTab từ popup).
+async function injectBundle(tabId) {
   const target = { tabId, frameIds: [0] };
   await chrome.scripting.executeScript({
     target,
@@ -226,6 +235,19 @@ async function injectIntoTab(tabId) {
     target,
     files: isolatedContentFiles(),
   });
+}
+
+const tabLive = createTabLive({
+  offscreenDoc,
+  injectTopFrame: injectBundle,
+  readSettings,
+  hasWhisperKey: async () =>
+    Boolean((await chrome.storage.local.get("whisperApiKey")).whisperApiKey),
+});
+
+// "Thử lồng tiếng trang này".
+async function injectIntoTab(tabId) {
+  await injectBundle(tabId);
   await chrome.tabs.sendMessage(
     tabId,
     { type: "ltv:toggle", force: true },
@@ -278,14 +300,40 @@ const messageHandlers = {
     await injectIntoTab(message.tabId);
     return { ok: true };
   },
+  "ltv:tabLive:start": async (message) => ({
+    ok: true,
+    ...(await tabLive.start(message)),
+  }),
+  "ltv:tabLive:stop": async () => {
+    await tabLive.stop("Đã dừng nghe cả thẻ.");
+    return { ok: true };
+  },
+  "ltv:tabLive:status": async (message) => ({
+    ok: true,
+    ...(await tabLive.status(message.tabId)),
+  }),
 };
+
+// Tin từ offscreen document: sự kiện giọng đọc, sự kiện nghe cả thẻ, và yêu
+// cầu chép lời Whisper (service worker giữ API key).
+function handleOffscreenMessage(message, sendResponse) {
+  if (message.type === "speech") speech.handleOffscreenEvent(message);
+  else if (message.type === "tabLive:event")
+    tabLive.relay(message).catch(() => {});
+  else if (message.type === "offscreen:asr") {
+    transcribeChunk(message.message || {}).then((reply) =>
+      sendResponse({ type: "asr", ...reply }),
+    );
+    return true;
+  }
+  return false;
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.target === "background") {
-    // Chỉ offscreen document của tiện ích gửi sự kiện giọng đọc.
-    if (sender.url === offscreenDoc.url() && message.type === "speech")
-      speech.handleOffscreenEvent(message);
-    return false;
+    // Chỉ nhận từ offscreen document của chính tiện ích.
+    if (sender.url !== offscreenDoc.url()) return false;
+    return handleOffscreenMessage(message, sendResponse);
   }
   // Chỉ trang của chính tiện ích (popup, options) được gọi các lệnh này,
   // không phải content script chạy trong trang web.
@@ -302,11 +350,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Phím tắt: bật/tắt ở khung có video (trang chính hoặc video nhúng).
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabLive.stopIfTab(tabId).catch(() => {});
+});
+
+// Phím tắt: đang nghe cả thẻ thì dừng; không thì bật/tắt ở khung có video
+// (trang chính hoặc video nhúng).
 chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "toggle-dubbing") return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab?.id === undefined) return;
+  if ((await tabLive.status(tab.id)).active) {
+    await tabLive.stop("Đã dừng nghe cả thẻ.");
+    return;
+  }
   const frameId = LTV.chooseFrame(await frameProbe.probe(tab.id));
   if (frameId === null) return;
   chrome.tabs

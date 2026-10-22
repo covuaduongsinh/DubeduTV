@@ -24,7 +24,14 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["storage", "tts", "offscreen", "activeTab", "scripting"],
+  "permissions": [
+    "storage",
+    "tts",
+    "offscreen",
+    "activeTab",
+    "scripting",
+    "tabCapture"
+  ],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://m.youtube.com/*",
@@ -98,6 +105,7 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/tab-live.js",
         "content/badges.js",
         "content/quiz.js",
         "content/addons.js",
@@ -157,6 +165,7 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/tab-live.js",
         "content/badges.js",
         "content/quiz.js",
         "content/addons.js",

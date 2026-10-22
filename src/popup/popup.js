@@ -1,6 +1,7 @@
 import "../shared/defaults.js";
 import "../shared/frame-probe.js";
 import { initChromePack } from "./chrome-pack.js";
+import { initTabLive } from "./tab-live.js";
 
 const LTV = globalThis.LTV;
 const $ = (id) => document.getElementById(id);
@@ -186,7 +187,16 @@ function describeStatus(status) {
   return { text: status.status.message || "Đang chuẩn bị…", tone };
 }
 
+const tabLive = initTabLive({
+  getTab: () => tab,
+  onChange: () => refreshStatus(),
+});
+
 function renderStatus(status) {
+  // Đang nghe cả thẻ: không bật lồng tiếng riêng trong trang (tránh đọc trùng).
+  tabLive.refresh(status).then((listening) => {
+    if (listening) $("toggle").hidden = true;
+  });
   if (status?.lang && status.lang !== lastStatus?.lang) {
     lastStatus = status;
     chromePack.refresh();
