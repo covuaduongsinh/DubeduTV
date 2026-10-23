@@ -298,6 +298,10 @@ const messageHandlers = {
     ok: true,
     text: await testClaude(message),
   }),
+  "ltv:diagnoseGoogle": async () => ({
+    ok: true,
+    results: await translateGoogle.diagnose(),
+  }),
   "ltv:cacheStats": async () => ({ ok: true, ...(await cache.stats()) }),
   "ltv:cacheClear": async () => {
     await cache.clear();

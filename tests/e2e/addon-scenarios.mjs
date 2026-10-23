@@ -1,7 +1,8 @@
 // Kịch bản e2e cho phần chạy kèm: nút dịch câu hỏi trắc nghiệm, huy hiệu
 // "Đã lồng" trên danh sách video, tự bật "chỉ video đã lồng" và bộ dịch
 // Chrome trên máy (Chromium thử nghiệm có thể không có Translator API: khi đó
-// phải tự dùng Google Dịch và lưu cache đúng bộ dịch thật).
+// phải tự dùng Google Dịch và lưu cache đúng bộ dịch thật), và nút kiểm tra
+// kết nối Google Dịch ở trang Tuỳ chọn (gọi Google thật).
 import {
   VIETNAMESE,
   checker,
@@ -222,6 +223,47 @@ async function glossaryScenario(context, { baseUrl }) {
   };
 }
 
+// Trang Tuỳ chọn → Kiểm tra kết nối Google Dịch: một dòng ✓/✗ cho mỗi cách
+// gọi; ít nhất một cách qua được (e2e cần Google Dịch thật).
+async function googleDiagnoseScenario(context, { worker }) {
+  const { failures, check } = checker();
+  const page = await context.newPage();
+  await page.goto(
+    `chrome-extension://${new URL(worker.url()).host}/options/options.html`,
+  );
+  await page.click("#google-diagnose");
+  const done = await waitUntil(
+    page,
+    () =>
+      !/Đang kiểm tra/.test(
+        document.getElementById("google-diagnose-result").textContent,
+      ),
+    null,
+    60000,
+  );
+  check(done, "kiểm tra kết nối không xong sau 60 giây");
+  const rows = await page.$$eval("#google-diagnose-list li", (items) =>
+    items.map((item) => item.textContent),
+  );
+  const summary = await page.locator("#google-diagnose-result").textContent();
+  await page.close();
+  check(rows.length === 5, `có ${rows.length}/5 dòng kết quả`);
+  check(
+    rows.every((row) => /^[✓✗] translate\.google(apis)?\.com · /.test(row)),
+    `dòng kết quả sai dạng: ${rows.join(" | ")}`,
+  );
+  check(
+    rows.some((row) => /^✓ .*“knight” → “.+”/.test(row)),
+    "không cách gọi nào dịch được",
+  );
+  check(/Có cách gọi qua được/.test(summary), `tóm tắt: "${summary}"`);
+  return {
+    name: "Tuỳ chọn → Kiểm tra kết nối Google Dịch (Google thật)",
+    failures,
+    spoken: [...rows, summary],
+  };
+}
+
 export function addonScenarios(context, options) {
   return [
     () => glossaryScenario(context, options),
@@ -229,5 +271,6 @@ export function addonScenarios(context, options) {
     () => badgesScenario(context, options),
     () => cachedAutoStartScenario(context, options),
     () => chromeTranslatorScenario(context, options),
+    () => googleDiagnoseScenario(context, options),
   ];
 }

@@ -264,6 +264,8 @@
       // Trễ quá MAX_LAG_SECONDS: cắt câu cũ để bắt kịp video.
       voice.stop();
       lastStarted = index;
+      // Đoạn dịch trước trượt theo câu đang đọc.
+      config.ensureTranslated(index);
       if (action === "skip") return;
       voice.start(index, t, onFinished);
       showLine(index, t);

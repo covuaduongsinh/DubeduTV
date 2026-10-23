@@ -273,7 +273,11 @@
         onLine: (sentence) => state.ui.overlay?.setLine(sentence),
         onSpeechResult: voice.handle,
       });
-      session.queue?.ensureFrom(0);
+      // Dịch trước từ chỗ đang xem (link có &t=… mở giữa video).
+      const from = session.sentences.findIndex(
+        (sentence) => sentence.end >= video.currentTime,
+      );
+      session.queue?.ensureFrom(from < 0 ? 0 : from);
       session.dubber.start();
       setStatus(
         "dubbing",

@@ -120,6 +120,41 @@ function bindCustomTerms(settings) {
   });
 }
 
+// Kiểm tra từng cách gọi Google Dịch (service worker gọi, như khi dịch thật).
+function bindGoogleDiagnose() {
+  const button = $("google-diagnose");
+  const list = $("google-diagnose-list");
+  const result = $("google-diagnose-result");
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    list.hidden = true;
+    result.className = "hint";
+    result.textContent = "Đang kiểm tra…";
+    const response = await chrome.runtime
+      .sendMessage({ type: "ltv:diagnoseGoogle" })
+      .catch((error) => ({ ok: false, error: error.message }));
+    button.disabled = false;
+    if (!response?.ok) {
+      result.className = "hint error";
+      result.textContent = `Lỗi kiểm tra: ${response?.error || "không rõ"}`;
+      return;
+    }
+    list.replaceChildren(
+      ...response.results.map((row) => {
+        const item = document.createElement("li");
+        item.className = row.ok ? "" : "error";
+        item.textContent = `${row.ok ? "✓" : "✗"} ${row.label}: ${row.detail}`;
+        return item;
+      }),
+    );
+    list.hidden = false;
+    const working = response.results.some((row) => row.ok);
+    result.textContent = working
+      ? "Có cách gọi qua được – tiện ích sẽ dùng cách đó. Mở lại video để dịch."
+      : "Google Dịch đang chặn mọi cách gọi từ mạng này. Chọn bộ dịch “Chrome trên máy” (bấm “Tải gói dịch” bên dưới) hoặc Claude, rồi thử lại Google sau ít phút.";
+  });
+}
+
 async function refreshStats() {
   const [cache, transcripts] = await Promise.all([
     chrome.runtime.sendMessage({ type: "ltv:cacheStats" }),
@@ -178,6 +213,7 @@ async function init() {
     settings,
   );
   bindCustomTerms(settings);
+  bindGoogleDiagnose();
   bindCloudVoices(settings);
   $("clear-cache").addEventListener("click", async () => {
     await chrome.runtime.sendMessage({ type: "ltv:cacheClear" });

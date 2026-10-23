@@ -142,3 +142,49 @@ test("hàng đợi dịch lưu cache theo bộ dịch thật, đọc cache của
     },
   ]);
 });
+
+test("hàng đợi dịch chỉ dịch trước 200 câu từ chỗ đang xem, trượt theo video", async () => {
+  const sentences = Array.from({ length: 1000 }, (_, i) => ({
+    text: `line ${i}`,
+  }));
+  const connection = fakeConnection((message) => ({
+    results: message.texts.map((text) => `vi ${text}`),
+    engines: message.texts.map(() => "google"),
+  }));
+  const queue = LTV.createTranslationQueue({
+    sentences,
+    connection,
+    engine: "google",
+    cacheKeyFor: (engine) => `k:${engine}`,
+    sl: "en",
+    tl: "vi",
+    title: "",
+  });
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const translated = () =>
+    sentences.flatMap((sentence, index) => (sentence.tr ? [index] : []));
+  queue.ensureFrom(0);
+  await settle();
+  assert.deepEqual(
+    translated(),
+    Array.from({ length: 200 }, (_, i) => i),
+  );
+  assert.deepEqual(queue.progress(), { done: 200, total: 200 });
+  // Đọc tới câu 50: dịch thêm tới câu 249.
+  queue.ensureFrom(50);
+  await settle();
+  assert.equal(translated().length, 250);
+  assert.equal(translated().at(-1), 249);
+  // Tua tới câu 700: dịch 700–899, lô đầu nhỏ để đọc lại nhanh.
+  const before = connection.requests.length;
+  queue.ensureFrom(700);
+  await settle();
+  const after = connection.requests
+    .slice(before)
+    .filter((m) => m.type === "translate");
+  assert.equal(after[0].texts[0], "line 700");
+  assert.equal(after[0].texts.length, 10);
+  assert.equal(translated().length, 450);
+  assert.equal(sentences[899].tr, "vi line 899");
+  assert.equal(sentences[900].tr, undefined);
+});

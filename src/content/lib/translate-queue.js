@@ -1,5 +1,7 @@
-// Hàng đợi dịch: ưu tiên các câu quanh vị trí đang xem (lô đầu nhỏ để bắt đầu
-// đọc sau vài giây), sau đó dịch dần phần còn lại. Bản dịch lưu cache theo
+// Hàng đợi dịch: chỉ dịch trước một đoạn câu từ vị trí đang xem (lô đầu nhỏ
+// để bắt đầu đọc sau vài giây), đoạn này trượt theo video. Không dịch cả video
+// một lúc: video dài hàng giờ sẽ thành hàng trăm yêu cầu dồn dập và Google
+// Dịch tạm chặn cả mạng của người dùng. Bản dịch lưu cache theo
 // video và theo bộ dịch thật đã dịch câu đó (Google dự phòng không bị lưu
 // thành bản dịch Claude); khi mở lại chỉ đọc cache của bộ dịch đang chọn.
 (function (root) {
@@ -9,15 +11,18 @@
   const BATCH = 40;
   const MAX_BATCH_CHARS = 4000;
   const MAX_INFLIGHT = 2;
+  // Số câu dịch trước tính từ vị trí đang xem (thường 10–15 phút video).
+  const LOOKAHEAD = 200;
   const CONTEXT_LINES = 3;
   const MAX_FAILURES = 3;
   const RETRY_AFTER_MS = 8000;
 
-  // Chỉ số các câu chưa dịch, chưa gửi, từ start trở đi (giới hạn số câu và ký tự).
-  function collectFrom(sentences, pending, start, size) {
+  // Chỉ số các câu chưa dịch, chưa gửi, trong [start, end) (giới hạn số câu và
+  // ký tự).
+  function collectFrom(sentences, pending, { start, end, size }) {
     const batch = [];
     let chars = 0;
-    for (let i = start; i < sentences.length && batch.length < size; i += 1) {
+    for (let i = start; i < end && batch.length < size; i += 1) {
       if (sentences[i].tr || pending.has(i)) continue;
       if (
         batch.length > 0 &&
@@ -47,6 +52,28 @@
     return fresh;
   }
 
+  function countDone(sentences, from = 0, to = sentences.length) {
+    let count = 0;
+    for (let i = from; i < to; i += 1) if (sentences[i].tr) count += 1;
+    return count;
+  }
+
+  // Yêu cầu dịch một lô, kèm vài câu đứng trước làm ngữ cảnh.
+  function translateRequest(options, batch) {
+    const { sentences } = options;
+    const contextStart = Math.max(0, batch[0] - CONTEXT_LINES);
+    return {
+      type: "translate",
+      texts: batch.map((index) => sentences[index].text),
+      context: sentences.slice(contextStart, batch[0]).map((s) => s.text),
+      sl: options.sl,
+      tl: options.tl,
+      title: options.title,
+      engine: options.engine,
+      domain: options.domain || null,
+    };
+  }
+
   async function readCache(connection, key) {
     try {
       const response = await connection.request(
@@ -65,9 +92,7 @@
   }
 
   LTV.createTranslationQueue = function createTranslationQueue(options) {
-    const { sentences, connection, cacheKeyFor, engine, sl, tl, title } =
-      options;
-    const domain = options.domain || null;
+    const { sentences, connection, cacheKeyFor, engine } = options;
     const onProgress = options.onProgress || (() => {});
     const onWarning = options.onWarning || (() => {});
     const onError = options.onError || (() => {});
@@ -82,33 +107,35 @@
     const hashes = sentences.map((sentence) =>
       LTV.util.hashText(sentence.text),
     );
-    const doneCount = () =>
-      sentences.reduce((count, s) => count + (s.tr ? 1 : 0), 0);
+    const doneCount = (from, to) => countDone(sentences, from, to);
+    const windowEnd = () => Math.min(sentences.length, cursor + LOOKAHEAD);
+    // Tiến độ của đoạn dịch trước, không phải của cả video.
+    const progress = () => ({
+      done: doneCount(cursor, windowEnd()),
+      total: windowEnd() - cursor,
+    });
+    const report = () => {
+      const { done, total } = progress();
+      onProgress(done, total);
+    };
 
     function nextBatch() {
       const size = firstBatchSent ? BATCH : FIRST_BATCH;
-      const forward = collectFrom(sentences, pending, cursor, size);
-      return forward.length > 0
-        ? forward
-        : collectFrom(sentences, pending, 0, size);
+      return collectFrom(sentences, pending, {
+        start: cursor,
+        end: windowEnd(),
+        size,
+      });
     }
 
     async function send(batch) {
       batch.forEach((index) => pending.add(index));
       inflight += 1;
       firstBatchSent = true;
-      const contextStart = Math.max(0, batch[0] - CONTEXT_LINES);
       try {
-        const response = await connection.request({
-          type: "translate",
-          texts: batch.map((index) => sentences[index].text),
-          context: sentences.slice(contextStart, batch[0]).map((s) => s.text),
-          sl,
-          tl,
-          title,
-          engine,
-          domain,
-        });
+        const response = await connection.request(
+          translateRequest(options, batch),
+        );
         if (cancelled) return;
         const done = doneCount();
         saveFresh(
@@ -129,7 +156,7 @@
         batch.forEach((index) => pending.delete(index));
         inflight -= 1;
         if (!cancelled) {
-          onProgress(doneCount(), sentences.length);
+          report();
           pump();
         }
       }
@@ -151,15 +178,20 @@
           if (!sentence.tr && items[hashes[index]])
             sentence.tr = items[hashes[index]];
         });
-        onProgress(doneCount(), sentences.length);
+        report();
       },
+      // Gọi khi bắt đầu xem, mỗi khi đọc sang câu mới và khi tua: đoạn dịch
+      // trước trượt theo vị trí này.
       ensureFrom(index) {
-        const start = Math.max(0, index);
-        if (start !== cursor) cursor = start;
+        const start = Math.min(Math.max(0, index), sentences.length);
+        // Tua tới đoạn chưa dịch: lô đầu nhỏ để đọc lại nhanh.
+        if (start !== cursor && !sentences[start]?.tr && !pending.has(start))
+          firstBatchSent = false;
+        cursor = start;
         if (Date.now() >= pausedUntil && failures >= MAX_FAILURES) failures = 0;
         pump();
       },
-      progress: () => ({ done: doneCount(), total: sentences.length }),
+      progress,
       cancel() {
         cancelled = true;
       },

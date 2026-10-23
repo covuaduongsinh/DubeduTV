@@ -48,7 +48,7 @@ cả thẻ**.
 
 Tải tệp zip của bản mới nhất ở mục **Releases** của repo (hoặc tự build theo mục _Dành cho nhà phát triển_).
 
-1. Giải nén tệp `long-tieng-viet-v1.3.1.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
+1. Giải nén tệp `long-tieng-viet-v1.3.2.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
    thư mục rồi bấm biểu tượng tải lại ↻ của tiện ích trong `chrome://extensions`.)
 2. Mở Chrome, vào `chrome://extensions`, bật **Chế độ dành cho nhà phát triển** (góc phải trên).
 3. Bấm **Tải tiện ích đã giải nén** (Load unpacked) → chọn thư mục `long-tieng-viet`.
@@ -61,7 +61,8 @@ Dùng được trên Chrome 116+ và Microsoft Edge (cài tương tự ở `edge
 1. Mở một video YouTube (trang `watch`, Shorts hoặc video nhúng), bài giảng Udemy/Coursera, video trên Google
    Drive hoặc bài đăng có video trên X.
 2. Bấm nút **VI** trên trình phát (hoặc biểu tượng tiện ích → **Bật lồng tiếng**, hoặc **Alt+Shift+D**).
-3. Sau vài giây (lấy phụ đề và dịch đoạn đầu), giọng Việt bắt đầu đọc. Phần còn lại dịch dần phía sau.
+3. Sau vài giây (lấy phụ đề và dịch đoạn đầu), giọng Việt bắt đầu đọc. Tiện ích chỉ dịch trước khoảng 200 câu
+   tính từ chỗ đang xem và dịch tiếp theo video, nên video dài hàng giờ không gửi dồn hàng trăm yêu cầu dịch.
 
 Tự bật khi mở video (popup → **Tự bật khi mở video**): _Không_, _Chỉ video đã lồng trước đây_ (video đã có bản
 dịch hoặc lời chép trên máy) hoặc _Mọi video_. Video nhúng trong trang khác chỉ tự bật khi được phát có tiếng.
@@ -171,8 +172,10 @@ máy và chỉ gửi tới `api.anthropic.com`.
 - Udemy: nếu chưa lấy được phụ đề, hãy bật CC trong trình phát rồi bấm lồng tiếng lại.
 - Giọng Google và Google Dịch dùng endpoint công khai không chính thức, có thể bị giới hạn khi dùng rất nhiều.
   Mạng nhà/4G nhiều người dùng chung một IP đôi khi bị Google tạm chặn (trang xác minh “Sorry”): tiện ích tự
-  gọi lại qua translate.google.com kèm cookie Google của trình duyệt, rồi chuyển sang **Chrome trên máy** nếu
-  máy đã có gói dịch; nếu vẫn không được thì báo rõ lý do trên video.
+  thử 5 cách gọi Google Dịch (POST/GET, có và không kèm cookie Google của trình duyệt) và nhớ cách qua được.
+  Nếu mọi cách đều bị chặn, tiện ích ngừng gọi Google 1 phút, dịch bằng **Chrome trên máy** nếu máy đã tải gói
+  dịch, và báo rõ lý do trên video. Tuỳ chọn → **Kiểm tra kết nối Google Dịch** cho biết từng cách gọi đang qua
+  được hay bị chặn.
 - Không có đăng nhập/máy chủ đồng bộ bản dịch: mọi thứ chạy trên máy người dùng.
 
 ## Quyền riêng tư
@@ -195,7 +198,7 @@ Tiện ích chạy không cần thư viện; công cụ phát triển cần Node
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
 npm test            # 112 unit test (node --test)
 npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
-npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.1.zip
+npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.2.zip
 npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
                     # CHROMIUM_PATH nếu không ở /opt/pw-browsers/chromium – và mạng tới translate.googleapis.com)
 LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live

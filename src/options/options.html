@@ -40,6 +40,10 @@
         font-size: 15px;
         margin: 14px 0 4px;
       }
+      #google-diagnose-list {
+        list-style: none;
+        padding-left: 0;
+      }
       #test-result {
         margin: 8px 0 0;
         white-space: pre-wrap;
@@ -112,11 +116,23 @@
     </section>
 
     <section class="card">
-      <h2>Bộ dịch Chrome trên máy</h2>
+      <h2>Bộ dịch miễn phí: Google Dịch và Chrome trên máy</h2>
+      <p class="hint">
+        Google Dịch đôi khi tạm chặn mạng nhà/4G (nhiều người dùng chung một
+        IP). Bấm kiểm tra để xem từng cách gọi Google Dịch có qua được không;
+        tiện ích tự dùng cách đang qua được.
+      </p>
+      <div class="buttons">
+        <button id="google-diagnose">Kiểm tra kết nối Google Dịch</button>
+      </div>
+      <ul id="google-diagnose-list" hidden></ul>
+      <p id="google-diagnose-result" class="hint"></p>
+      <h3>Chrome trên máy</h3>
       <p class="hint">
         Chrome 138+ trên máy tính dịch được ngay trên máy: miễn phí, không cần
         mạng, phụ đề không rời khỏi máy. Chọn “Chrome trên máy” ở mục Bộ dịch
-        trong popup; gói dịch cho từng cặp ngôn ngữ tải một lần.
+        trong popup; gói dịch cho từng cặp ngôn ngữ tải một lần. Khi Google Dịch
+        bị chặn, tiện ích tự dịch bằng Chrome trên máy nếu đã tải gói.
       </p>
       <div id="chrome-pack" class="hint">
         <span id="chrome-pack-text"></span>

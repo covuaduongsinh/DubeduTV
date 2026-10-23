@@ -99,31 +99,35 @@ export function createTranslateRouter({ google, engines, glossarySettings }) {
         texts: missing.map((index) => plan.textsFor("chrome")[index]),
         terms: plan.terms,
       });
-      if (rescued) {
-        fill(missing, rescued, "chrome");
+      if (rescued?.output) {
+        fill(missing, rescued.output, "chrome");
         warning =
           "Google Dịch tạm không dùng được – đang dịch bằng Chrome trên máy";
       }
       const done = missing.every((index) => results[index]);
-      return done
-        ? { results, engines: used, warning }
-        : {
-            results,
-            engines: used,
-            warning,
-            error: error.message || "Lỗi dịch",
-          };
+      if (done) return { results, engines: used, warning };
+      // Nói rõ vì sao bộ dự phòng cũng không dịch được (vd. chưa tải gói dịch).
+      const fallback = rescued?.error
+        ? ` Dự phòng “Chrome trên máy” chưa dùng được: ${rescued.error}.`
+        : "";
+      return {
+        results,
+        engines: used,
+        warning,
+        error: `${error.message || "Lỗi dịch"}${fallback}`,
+      };
     }
   };
 }
 
 // Google bị chặn hoặc mất kết nối: thử bộ dịch Chrome trên máy (nếu người
-// dùng chưa chọn nó) cho các dòng còn thiếu. Trả mảng kết quả hoặc null.
+// dùng chưa chọn nó) cho các dòng còn thiếu. Trả { output } hoặc { error },
+// null nếu không thử.
 async function rescueWithChrome(engines, request, error, { texts, terms }) {
   const reachable = error?.code === "blocked" || error?.code === "network";
   if (!reachable || !engines.chrome || request.engine === "chrome") return null;
   try {
-    return await engines.chrome({
+    const output = await engines.chrome({
       texts,
       sl: request.sl,
       tl: request.tl,
@@ -131,7 +135,8 @@ async function rescueWithChrome(engines, request, error, { texts, terms }) {
       terms,
       context: [],
     });
-  } catch {
-    return null;
+    return { output };
+  } catch (chromeError) {
+    return { error: chromeError?.message || String(chromeError) };
   }
 }
