@@ -196,7 +196,7 @@ Tiện ích chạy không cần thư viện; công cụ phát triển cần Node
 
 ```bash
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
-npm test            # 112 unit test (node --test)
+npm test            # 120 unit test (node --test)
 npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
 npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.2.zip
 npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
