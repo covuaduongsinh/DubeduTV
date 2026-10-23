@@ -22,8 +22,14 @@ export function createCache({
       : {};
   }
 
-  async function flush() {
+  // Ghi ngay cũng huỷ lần ghi hẹn giờ (không để hẹn giờ treo lại).
+  function cancelScheduled() {
+    clearTimeout(timer);
     timer = null;
+  }
+
+  async function flush() {
+    cancelScheduled();
     if (dirty.size === 0) return;
     const batch = new Map(dirty);
     dirty.clear();
@@ -64,6 +70,7 @@ export function createCache({
     },
     flush,
     async clear() {
+      cancelScheduled();
       dirty.clear();
       const index = await readIndex();
       await storage.remove([

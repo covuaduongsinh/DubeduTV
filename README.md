@@ -186,7 +186,7 @@ chỉ lưu cục bộ (`storage.local`), không đồng bộ, và chỉ service 
 
 ## Dành cho nhà phát triển
 
-Tiện ích chạy không cần thư viện; công cụ phát triển cần Node.js 20+.
+Tiện ích chạy không cần thư viện; công cụ phát triển cần Node.js 22+.
 
 ```bash
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
@@ -198,7 +198,7 @@ npm run e2e         # build bản --test và chạy Chromium thật trên trang 
 LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live
 ```
 
-CI (GitHub Actions) chạy `npm run check` và `npm run build` trên Node 20 và 24, đính kèm tệp zip vào mỗi lần
+CI (GitHub Actions) chạy `npm run check` và `npm run build` trên Node 22 và 24, đính kèm tệp zip vào mỗi lần
 chạy. E2E chạy tay vì cần mạng tới Google Dịch (dễ bị giới hạn lượt khi chạy dày).
 
 Cấu trúc:
