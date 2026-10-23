@@ -3,8 +3,9 @@
 Tiện ích Chrome (Manifest V3) đọc lồng tiếng Việt ngay trên trang video **YouTube (cả Shorts, bản di động và
 video nhúng), Udemy, Coursera, Google Drive, X/Twitter**: lấy phụ đề sẵn có của video (phụ đề thủ công hoặc tự
 động) – hoặc **tự nghe và chép lời khi video không có phụ đề** – dịch sang tiếng Việt, rồi đọc từng câu, đồng
-thời giảm tiếng gốc khi đang đọc. Mã viết mới hoàn toàn bởi Công ty CP Cờ vua Dương Sinh. Bản 1.3 thêm **từ điển thuật ngữ cờ vua**, **giọng AI tự nhiên (Azure, Google Cloud)** và **điều
-khiển video nhúng khi nghe cả thẻ**.
+thời giảm tiếng gốc khi đang đọc. Mã viết mới hoàn toàn bởi Công ty CP Cờ vua Dương Sinh. Bản 1.3 thêm
+**từ điển thuật ngữ cờ vua**, **giọng AI tự nhiên (Azure, Google Cloud)** và **điều khiển video nhúng khi nghe
+cả thẻ**.
 
 ## Tính năng
 
@@ -44,6 +45,8 @@ khiển video nhúng khi nghe cả thẻ**.
 - Đích lồng tiếng chọn được: Tiếng Việt (mặc định), English, 中文, 日本語, 한국어, Français, Deutsch…
 
 ## Cài đặt (chưa lên Chrome Web Store)
+
+Tải tệp zip của bản mới nhất ở mục **Releases** của repo (hoặc tự build theo mục _Dành cho nhà phát triển_).
 
 1. Giải nén tệp `long-tieng-viet-v1.3.0.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
    thư mục rồi bấm biểu tượng tải lại ↻ của tiện ích trong `chrome://extensions`.)
@@ -183,16 +186,20 @@ chỉ lưu cục bộ (`storage.local`), không đồng bộ, và chỉ service 
 
 ## Dành cho nhà phát triển
 
-Không cần cài thư viện; Node.js 20+.
+Tiện ích chạy không cần thư viện; công cụ phát triển cần Node.js 20+.
 
 ```bash
-cd long-tieng-viet
+npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
 npm test            # 112 unit test (node --test)
+npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
 npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.0.zip
-npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần playwright-core
-                    # từ node_modules của repo gốc và mạng tới translate.googleapis.com)
+npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
+                    # CHROMIUM_PATH nếu không ở /opt/pw-browsers/chromium – và mạng tới translate.googleapis.com)
 LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live
 ```
+
+CI (GitHub Actions) chạy `npm run check` và `npm run build` trên Node 20 và 24, đính kèm tệp zip vào mỗi lần
+chạy. E2E chạy tay vì cần mạng tới Google Dịch (dễ bị giới hạn lượt khi chạy dày).
 
 Cấu trúc:
 
@@ -236,3 +243,8 @@ truy cập được từ môi trường kiểm thử. Chưa kiểm thử trên c
 chưa nghe giọng Google thật, chưa thử tải gói dịch Chrome, chưa đo chất lượng/độ trễ chép lời thật của Chrome
 và Whisper, chưa thử `tabCapture` + nhận dạng giọng trong offscreen trên Chrome thật – cần thử trên Google
 Chrome máy thật.
+
+## Giấy phép
+
+Bản quyền © 2026 Công ty Cổ phần Cờ vua Dương Sinh. Bảo lưu mọi quyền – mã nguồn công khai để xem và tham
+khảo; sao chép, sửa đổi, phân phối hay dùng thương mại cần văn bản cho phép. Xem [LICENSE](LICENSE).
