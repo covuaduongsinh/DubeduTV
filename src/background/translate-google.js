@@ -4,7 +4,28 @@
 
 import { TranslateError } from "./errors.js";
 
-const ENDPOINT = "https://translate.googleapis.com/translate_a/single";
+// Các "cửa" Google Dịch, thử lần lượt. Google có thể tạm chặn yêu cầu không
+// kèm cookie từ IP dùng chung (mạng nhà/4G thường nhiều người chung một IP)
+// bằng cách chuyển sang trang xác minh "Sorry": khi đó gọi qua
+// translate.google.com kèm cookie Google của trình duyệt, như khi người dùng
+// tự mở Google Dịch. Cửa dùng được được nhớ cho các lần dịch sau.
+export const GOOGLE_ENDPOINTS = [
+  {
+    url: "https://translate.googleapis.com/translate_a/single",
+    credentials: "omit",
+  },
+  {
+    url: "https://translate.google.com/translate_a/single",
+    credentials: "include",
+  },
+];
+
+const MESSAGES = {
+  blocked:
+    "Google Dịch đang tạm chặn yêu cầu từ mạng của bạn (trang xác minh “Sorry”). Thử lại sau vài phút hoặc chọn bộ dịch “Chrome trên máy”.",
+  network:
+    "Không kết nối được Google Dịch – kiểm tra mạng, tường lửa hoặc tiện ích chặn quảng cáo.",
+};
 const MAX_CHARS_PER_REQUEST = 4500;
 const SINGLE_CONCURRENCY = 4;
 const RETRY_DELAYS_MS = [1000, 2500];
@@ -47,70 +68,123 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function requestOnce(text, { sl, tl, fetchImpl }) {
-  const url = `${ENDPOINT}?client=gtx&dt=t&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}`;
-  const response = await fetchImpl(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    body: `q=${encodeURIComponent(text)}`,
-  });
-  if (!response.ok) {
-    const retryable = response.status === 429 || response.status >= 500;
-    throw new TranslateError(`Google Dịch lỗi HTTP ${response.status}`, {
-      status: response.status,
-      retryable,
+async function requestOnce(text, { sl, tl, fetchImpl }, endpoint) {
+  const url = `${endpoint.url}?client=gtx&dt=t&sl=${encodeURIComponent(sl)}&tl=${encodeURIComponent(tl)}`;
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: "POST",
+      credentials: endpoint.credentials,
+      // Tự xử lý chuyển hướng: theo sang trang "Sorry" (host tiện ích không có
+      // quyền) chỉ ra lỗi chung "Failed to fetch".
+      redirect: "manual",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: `q=${encodeURIComponent(text)}`,
+    });
+  } catch {
+    throw new TranslateError(MESSAGES.network, {
+      code: "network",
+      retryable: true,
     });
   }
+  const { status } = response;
+  const redirected =
+    response.type === "opaqueredirect" || (status >= 300 && status < 400);
+  if (redirected || status === 429)
+    throw new TranslateError(MESSAGES.blocked, { status, code: "blocked" });
+  if (!response.ok)
+    throw new TranslateError(`Google Dịch lỗi HTTP ${status}`, {
+      status,
+      retryable: status >= 500,
+      code: "http",
+    });
   return parseGoogleResponse(await response.json());
 }
 
-async function requestWithRetry(text, options) {
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      return await requestOnce(text, options);
-    } catch (error) {
-      const retryable = error.retryable || error.name === "TypeError";
-      if (!retryable || attempt >= RETRY_DELAYS_MS.length) throw error;
-      await sleep(options.retryDelay ?? RETRY_DELAYS_MS[attempt]);
+const SWITCH_CODES = new Set(["blocked", "network"]);
+
+// Một bộ dịch Google có trạng thái riêng: cửa đang dùng được.
+export function createGoogleTranslator({
+  endpoints = GOOGLE_ENDPOINTS,
+  log = (...args) => console.warn("[Lồng Tiếng Việt] Google Dịch", ...args),
+} = {}) {
+  let preferred = 0;
+
+  // Một cửa: thử lại khi mất kết nối hoặc lỗi máy chủ.
+  async function viaEndpoint(text, options, endpoint) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await requestOnce(text, options, endpoint);
+      } catch (error) {
+        if (!error.retryable || attempt >= RETRY_DELAYS_MS.length) throw error;
+        await sleep(options.retryDelay ?? RETRY_DELAYS_MS[attempt]);
+      }
     }
   }
-}
 
-async function translateIndividually(indexes, texts, out, options) {
-  const queue = indexes.slice();
-  const worker = async () => {
-    while (queue.length > 0) {
-      const index = queue.shift();
-      const result = await requestWithRetry(sanitize(texts[index]), options);
-      out[index] = result.trim();
+  // Bắt đầu từ cửa dùng được lần trước; cửa bị chặn/mất kết nối thì sang cửa
+  // khác. Mọi cửa đều hỏng: báo "bị chặn" nếu có cửa bị chặn.
+  async function request(text, options) {
+    let blocked = null;
+    let lastError = null;
+    for (let step = 0; step < endpoints.length; step += 1) {
+      const index = (preferred + step) % endpoints.length;
+      try {
+        const result = await viaEndpoint(text, options, endpoints[index]);
+        preferred = index;
+        return result;
+      } catch (error) {
+        log(endpoints[index].url, error.code || "", error.message);
+        if (!SWITCH_CODES.has(error.code)) throw error;
+        if (error.code === "blocked") blocked = blocked || error;
+        lastError = error;
+      }
     }
+    throw blocked || lastError;
+  }
+
+  async function translateIndividually(indexes, texts, out, options) {
+    const queue = indexes.slice();
+    const worker = async () => {
+      while (queue.length > 0) {
+        const index = queue.shift();
+        const result = await request(sanitize(texts[index]), options);
+        out[index] = result.trim();
+      }
+    };
+    await Promise.all(
+      Array.from(
+        { length: Math.min(SINGLE_CONCURRENCY, queue.length) },
+        worker,
+      ),
+    );
+  }
+
+  return async function translateGoogle({
+    texts,
+    sl = "auto",
+    tl,
+    fetchImpl = fetch,
+    retryDelay,
+  }) {
+    const out = Array.from({ length: texts.length }, () => null);
+    const options = { sl: sl || "auto", tl, fetchImpl, retryDelay };
+    for (const chunk of buildChunks(texts)) {
+      const joined = chunk.map((index) => sanitize(texts[index])).join("\n");
+      const lines = (await request(joined, options)).split("\n");
+      if (lines.length === chunk.length) {
+        chunk.forEach((index, k) => {
+          out[index] = lines[k].trim();
+        });
+      } else {
+        await translateIndividually(chunk, texts, out, options);
+      }
+    }
+    return out;
   };
-  await Promise.all(
-    Array.from({ length: Math.min(SINGLE_CONCURRENCY, queue.length) }, worker),
-  );
 }
 
-export async function translateGoogle({
-  texts,
-  sl = "auto",
-  tl,
-  fetchImpl = fetch,
-  retryDelay,
-}) {
-  const out = Array.from({ length: texts.length }, () => null);
-  const options = { sl: sl || "auto", tl, fetchImpl, retryDelay };
-  for (const chunk of buildChunks(texts)) {
-    const joined = chunk.map((index) => sanitize(texts[index])).join("\n");
-    const lines = (await requestWithRetry(joined, options)).split("\n");
-    if (lines.length === chunk.length) {
-      chunk.forEach((index, k) => {
-        out[index] = lines[k].trim();
-      });
-    } else {
-      await translateIndividually(chunk, texts, out, options);
-    }
-  }
-  return out;
-}
+// Bộ dịch dùng chung của service worker.
+export const translateGoogle = createGoogleTranslator();

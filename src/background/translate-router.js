@@ -79,6 +79,12 @@ export function createTranslateRouter({ google, engines, glossarySettings }) {
       results[index] ? [] : [index],
     );
     if (missing.length === 0) return { results, engines: used, warning };
+    const fill = (indexes, output, filler) =>
+      indexes.forEach((index, k) => {
+        if (!usable(output?.[k])) return;
+        results[index] = plan.finish(index, output[k], filler);
+        used[index] = filler;
+      });
     try {
       const googleTexts = plan.textsFor("google");
       const filled = await google({
@@ -86,19 +92,46 @@ export function createTranslateRouter({ google, engines, glossarySettings }) {
         sl,
         tl,
       });
-      missing.forEach((index, k) => {
-        if (!usable(filled[k])) return;
-        results[index] = plan.finish(index, filled[k], "google");
-        used[index] = "google";
-      });
+      fill(missing, filled, "google");
       return { results, engines: used, warning };
     } catch (error) {
-      return {
-        results,
-        engines: used,
-        warning,
-        error: error.message || "Lỗi dịch",
-      };
+      const rescued = await rescueWithChrome(engines, request, error, {
+        texts: missing.map((index) => plan.textsFor("chrome")[index]),
+        terms: plan.terms,
+      });
+      if (rescued) {
+        fill(missing, rescued, "chrome");
+        warning =
+          "Google Dịch tạm không dùng được – đang dịch bằng Chrome trên máy";
+      }
+      const done = missing.every((index) => results[index]);
+      return done
+        ? { results, engines: used, warning }
+        : {
+            results,
+            engines: used,
+            warning,
+            error: error.message || "Lỗi dịch",
+          };
     }
   };
+}
+
+// Google bị chặn hoặc mất kết nối: thử bộ dịch Chrome trên máy (nếu người
+// dùng chưa chọn nó) cho các dòng còn thiếu. Trả mảng kết quả hoặc null.
+async function rescueWithChrome(engines, request, error, { texts, terms }) {
+  const reachable = error?.code === "blocked" || error?.code === "network";
+  if (!reachable || !engines.chrome || request.engine === "chrome") return null;
+  try {
+    return await engines.chrome({
+      texts,
+      sl: request.sl,
+      tl: request.tl,
+      title: request.title,
+      terms,
+      context: [],
+    });
+  } catch {
+    return null;
+  }
 }

@@ -2,9 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildChunks,
+  createGoogleTranslator,
   parseGoogleResponse,
   translateGoogle,
 } from "../src/background/translate-google.js";
+import { createTranslateRouter } from "../src/background/translate-router.js";
 import {
   buildClaudeRequest,
   buildHeaders,
@@ -90,6 +92,96 @@ test("translateGoogle thử lại khi gặp 429", async () => {
   });
   assert.deepEqual(result, ["ok"]);
   assert.equal(attempts, 2);
+});
+
+// Google chặn tạm: chuyển hướng sang trang "Sorry" (fetch redirect: "manual").
+const SORRY = { ok: false, status: 0, type: "opaqueredirect" };
+
+test("Google Dịch bị chặn ở cửa googleapis thì gọi translate.google.com kèm cookie, và nhớ cửa đó", async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, credentials: init.credentials, redirect: init.redirect });
+    if (url.startsWith("https://translate.googleapis.com/")) return SORRY;
+    return jsonResponse([[["Mã nhảy", "x"]]]);
+  };
+  const translate = createGoogleTranslator({ log: () => {} });
+  assert.deepEqual(await translate({ texts: ["x"], tl: "vi", fetchImpl }), [
+    "Mã nhảy",
+  ]);
+  assert.deepEqual(
+    calls.map((call) => [
+      new URL(call.url).host,
+      call.credentials,
+      call.redirect,
+    ]),
+    [
+      ["translate.googleapis.com", "omit", "manual"],
+      ["translate.google.com", "include", "manual"],
+    ],
+  );
+  await translate({ texts: ["y"], tl: "vi", fetchImpl });
+  assert.equal(new URL(calls.at(-1).url).host, "translate.google.com");
+  assert.equal(calls.length, 3);
+});
+
+test('Google Dịch: mọi cửa bị chặn hoặc mất mạng thì báo lỗi rõ ràng thay cho "Failed to fetch"', async () => {
+  const blocked = createGoogleTranslator({ log: () => {} });
+  await assert.rejects(
+    blocked({ texts: ["x"], tl: "vi", fetchImpl: async () => SORRY }),
+    (error) => error.code === "blocked" && /tạm chặn/.test(error.message),
+  );
+  let attempts = 0;
+  const offline = createGoogleTranslator({ log: () => {} });
+  await assert.rejects(
+    offline({
+      texts: ["x"],
+      tl: "vi",
+      retryDelay: 0,
+      fetchImpl: async () => {
+        attempts += 1;
+        throw new TypeError("Failed to fetch");
+      },
+    }),
+    (error) =>
+      error.code === "network" && /Không kết nối được/.test(error.message),
+  );
+  // Mỗi cửa thử 3 lần (lần đầu + 2 lần thử lại).
+  assert.equal(attempts, 6);
+});
+
+test("router: Google bị chặn thì dịch bằng Chrome trên máy và ghi đúng bộ dịch", async () => {
+  const blockedError = Object.assign(new Error("Google Dịch đang tạm chặn"), {
+    code: "blocked",
+  });
+  const translate = createTranslateRouter({
+    google: async () => {
+      throw blockedError;
+    },
+    engines: { chrome: async ({ texts }) => texts.map((text) => `vi:${text}`) },
+  });
+  const reply = await translate({
+    texts: ["a", "b"],
+    sl: "en",
+    tl: "vi",
+    engine: "google",
+  });
+  assert.deepEqual(reply.results, ["vi:a", "vi:b"]);
+  assert.deepEqual(reply.engines, ["chrome", "chrome"]);
+  assert.match(reply.warning, /Chrome trên máy/);
+  assert.equal(reply.error, undefined);
+  const noChrome = createTranslateRouter({
+    google: async () => {
+      throw blockedError;
+    },
+    engines: { chrome: async () => [null, null] },
+  });
+  const failed = await noChrome({
+    texts: ["a", "b"],
+    sl: "en",
+    tl: "vi",
+    engine: "google",
+  });
+  assert.match(failed.error, /tạm chặn/);
 });
 
 test("buildClaudeRequest dùng structured output, effort thấp và fallback cho Opus", () => {

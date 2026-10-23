@@ -48,7 +48,7 @@ cả thẻ**.
 
 Tải tệp zip của bản mới nhất ở mục **Releases** của repo (hoặc tự build theo mục _Dành cho nhà phát triển_).
 
-1. Giải nén tệp `long-tieng-viet-v1.3.0.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
+1. Giải nén tệp `long-tieng-viet-v1.3.1.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
    thư mục rồi bấm biểu tượng tải lại ↻ của tiện ích trong `chrome://extensions`.)
 2. Mở Chrome, vào `chrome://extensions`, bật **Chế độ dành cho nhà phát triển** (góc phải trên).
 3. Bấm **Tải tiện ích đã giải nén** (Load unpacked) → chọn thư mục `long-tieng-viet`.
@@ -170,6 +170,9 @@ máy và chỉ gửi tới `api.anthropic.com`.
 - Từ điển thuật ngữ sửa theo danh sách cách dịch sai đã biết; cách dịch sai mới thì thêm vào từ điển riêng.
 - Udemy: nếu chưa lấy được phụ đề, hãy bật CC trong trình phát rồi bấm lồng tiếng lại.
 - Giọng Google và Google Dịch dùng endpoint công khai không chính thức, có thể bị giới hạn khi dùng rất nhiều.
+  Mạng nhà/4G nhiều người dùng chung một IP đôi khi bị Google tạm chặn (trang xác minh “Sorry”): tiện ích tự
+  gọi lại qua translate.google.com kèm cookie Google của trình duyệt, rồi chuyển sang **Chrome trên máy** nếu
+  máy đã có gói dịch; nếu vẫn không được thì báo rõ lý do trên video.
 - Không có đăng nhập/máy chủ đồng bộ bản dịch: mọi thứ chạy trên máy người dùng.
 
 ## Quyền riêng tư
@@ -192,7 +195,7 @@ Tiện ích chạy không cần thư viện; công cụ phát triển cần Node
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
 npm test            # 112 unit test (node --test)
 npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
-npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.0.zip
+npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.1.zip
 npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
                     # CHROMIUM_PATH nếu không ở /opt/pw-browsers/chromium – và mạng tới translate.googleapis.com)
 LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live
