@@ -1,6 +1,7 @@
 // Các phần chạy kèm ngoài phiên lồng tiếng của video: phía trang Google Drive
 // (trả lời khung trình phát), nút dịch câu hỏi trắc nghiệm, huy hiệu
-// "Đã lồng" trên danh sách video và bộ nhận "nghe âm thanh cả thẻ".
+// "Đã lồng" trên danh sách video và bộ nhận "nghe âm thanh cả thẻ" (mọi
+// khung: service worker gửi lời chép tới khung có video).
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
@@ -12,9 +13,8 @@
     siteId,
     isTop,
   }) {
-    const parts = [];
+    const parts = [LTV.createTabLiveHost({ connection, getSettings, voice })];
     if (isTop) {
-      parts.push(LTV.createTabLiveHost({ connection, getSettings, voice }));
       if (LTV.driveHost?.matches(location)) LTV.driveHost.start();
       if (siteId === "youtube")
         parts.push(LTV.createBadges({ connection, getSettings }));

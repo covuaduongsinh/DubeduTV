@@ -19,6 +19,8 @@ import {
   embedHostPage,
   feedPage,
   lessonSrv3,
+  mediaHostPage,
+  plainFramePage,
   quizPage,
   xMaster,
   xPage,
@@ -36,6 +38,7 @@ function media() {
     "/media/silence.wav": silenceWav(),
     "/media/short.wav": silenceWav(19),
     "/media/tone.wav": silenceWav(20, 8000, true),
+    "/media/tone7.wav": silenceWav(7, 8000, true),
   };
 }
 
@@ -97,6 +100,15 @@ function route(url, request, origins) {
       { "set-cookie": "drive_auth=1; Path=/; SameSite=Lax" },
     ];
   if (pathname === "/drive-embed/") return [200, HTML, driveEmbedPage()];
+  if (pathname === "/plain-frame") return [200, HTML, plainFramePage()];
+  if (pathname === "/media-host") {
+    const params = url.searchParams;
+    const pick = (name) =>
+      Object.hasOwn(origins.byName, params.get(name) || "")
+        ? origins.byName[params.get(name)]
+        : null;
+    return [200, HTML, mediaHostPage(pick("frame"), pick("ad"))];
+  }
   if (pathname.startsWith("/x/status/"))
     return [200, HTML, xPage(origins.frame)];
   return null;
@@ -155,6 +167,12 @@ export function startServer() {
     const origins = {
       host: `http://127.0.0.1:${port}`,
       frame: `http://localhost:${port}`,
+      // ip2: origin bản test không có quyền host (127.0.0.0/8 vẫn là máy này).
+      byName: {
+        local: `http://localhost:${port}`,
+        ip1: `http://127.0.0.1:${port}`,
+        ip2: `http://127.0.0.2:${port}`,
+      },
     };
     const send = (status, type, body, headers = {}) => {
       response.writeHead(status, {

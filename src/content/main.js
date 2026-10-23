@@ -39,14 +39,15 @@
   const auto = LTV.createAutoStart({ connection, getSettings, isTop });
   let addons = null;
 
+  const html5 = () => LTV.providers.find((item) => item.id === "html5");
+
   function pickProvider() {
-    if (typeof LTV.pickProvider === "function")
-      return LTV.pickProvider(location);
-    const provider = LTV.providers.find((item) => item.matches(location));
+    const provider =
+      typeof LTV.pickProvider === "function"
+        ? LTV.pickProvider(location)
+        : LTV.providers.find((item) => item.matches(location));
     if (provider) return provider;
-    return state.forced
-      ? LTV.providers.find((item) => item.id === "html5")
-      : null;
+    return state.forced ? html5() : null;
   }
 
   const sessionIdFor = (provider, key) =>
@@ -377,6 +378,20 @@
       lang: session?.lang || null,
     };
   }
+
+  // "Nghe cả thẻ": video lớn nhất của khung và khoá của nó – trùng khoá phiên
+  // khi bật lồng tiếng tại khung (kể cả bật tay bằng html5) để lần sau đọc
+  // lại lời chép đã lưu.
+  LTV.mediaInfo = function mediaInfo() {
+    const video = LTV.util.largestVideo(document);
+    if (!video) return null;
+    const rect = video.getBoundingClientRect();
+    const fallback = html5();
+    return {
+      area: Math.round(rect.width * rect.height),
+      key: currentId() || sessionIdFor(fallback, fallback.videoKey(location)),
+    };
+  };
 
   // Thông tin để popup/phím tắt chọn khung có video (trang chính hoặc nhúng).
   function frameInfo() {

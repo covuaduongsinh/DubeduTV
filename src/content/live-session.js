@@ -47,7 +47,12 @@
   }
 
   // Gom lời chép mới và gửi service worker lưu theo lô (debounce).
-  function createTranscriptSaver({ connection, key, video, meta }) {
+  LTV.createTranscriptSaver = function createTranscriptSaver({
+    connection,
+    key,
+    video,
+    meta,
+  }) {
     const unsaved = [];
     let timer = null;
 
@@ -71,7 +76,7 @@
       },
       flush,
     };
-  }
+  };
 
   function listeningMessage(engine) {
     const label = engine === "whisper" ? "Whisper" : "Chrome";
@@ -93,7 +98,7 @@
     let heard = 0;
     let lang = "en-US";
     let engine = null;
-    const saver = createTranscriptSaver({
+    const saver = LTV.createTranscriptSaver({
       connection,
       key: sessionId,
       video,

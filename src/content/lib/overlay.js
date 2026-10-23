@@ -2,7 +2,8 @@
 // phụ đề dịch/song ngữ, thông báo trạng thái và nút bật/tắt dạng viên thuốc
 // cho trang không có thanh điều khiển riêng. Nút trên thanh điều khiển
 // YouTube nằm ở createPlayerButton. Chế độ fixed (nghe cả thẻ) phủ theo vị
-// trí trên màn hình của một phần tử (khung video nhúng) hoặc cả cửa sổ.
+// trí trên màn hình của một phần tử (khung video nhúng) hoặc cả cửa sổ. Khi
+// chính <video> toàn màn hình, câu đang đọc hiện qua track phụ đề của video.
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
@@ -61,6 +62,48 @@
     box.hidden = mode === "off" || !mainText;
   }
 
+  // Chính <video> vào toàn màn hình (không qua khung trình phát) thì lớp phủ
+  // không hiện được: hiện câu đang đọc bằng track phụ đề của video.
+  function createFullscreenCues(video) {
+    let track = null;
+    let text = "";
+
+    function ensureStyle() {
+      if (document.getElementById("ltv-cue-style")) return;
+      const style = document.createElement("style");
+      style.id = "ltv-cue-style";
+      // Thắng quy tắc làm trong suốt phụ đề gốc (video::cue) của tiện ích.
+      style.textContent =
+        "video::cue(.ltv){color:#fff !important;background:rgba(8,10,14,.78) !important;}";
+      (document.head || document.documentElement).appendChild(style);
+    }
+
+    function sync() {
+      if (document.fullscreenElement !== video || !text) {
+        if (track) track.mode = "disabled";
+        return;
+      }
+      track = track || video.addTextTrack("subtitles", "Lồng Tiếng Việt", "vi");
+      track.mode = "showing";
+      for (const cue of Array.from(track.cues || [])) track.removeCue(cue);
+      ensureStyle();
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      track.addCue(new VTTCue(0, 1e9, `<c.ltv>${escaped}</c>`));
+    }
+
+    document.addEventListener("fullscreenchange", sync);
+    return {
+      set(value) {
+        text = value || "";
+        sync();
+      },
+      dispose() {
+        document.removeEventListener("fullscreenchange", sync);
+        if (track) track.mode = "disabled";
+      },
+    };
+  }
+
   // Khung phủ theo phần tử neo (đủ lớn) hoặc cả cửa sổ.
   function anchorRect(anchor) {
     const rect = anchor?.()?.getBoundingClientRect();
@@ -113,8 +156,11 @@
       box.style.fontSize = `${fontSize(getSettings().subtitleSize, width)}px`;
     }
 
-    const render = (sentence) =>
+    const cues = video && !fixed ? createFullscreenCues(video) : null;
+    const render = (sentence) => {
       renderLine({ box, main, orig }, getSettings().subtitleMode, sentence);
+      cues?.set(box.hidden ? "" : main.textContent);
+    };
 
     const resizeObserver = new ResizeObserver(position);
     if (video) resizeObserver.observe(video);
@@ -166,6 +212,7 @@
         resizeObserver.disconnect();
         removeEventListener("scroll", reposition, { capture: true });
         removeEventListener("resize", reposition);
+        cues?.dispose();
         host.remove();
       },
     };

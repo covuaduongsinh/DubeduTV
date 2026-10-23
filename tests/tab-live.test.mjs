@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import { LTV } from "./helpers.mjs";
 import { fakeClock, fakeSpeech } from "./fakes.mjs";
 import "../src/content/live-dubber.js";
+import "../src/content/tab-linked.js";
 import "../src/content/tab-live.js";
 import "../src/offscreen/tab-capture.js";
 import { createTabLive } from "../src/background/tab-live.js";
+import { createMediaLink } from "../src/background/media-link.js";
 
 function fakeAudioContext({ running = true } = {}) {
   const log = [];
@@ -155,6 +157,9 @@ test("điều phối nghe cả thẻ: nạp script khi trang chưa có, tạm d�
     startedAt: 1000,
     lang: "en-US",
     engine: "chrome",
+    frameId: 0,
+    linked: false,
+    key: "",
   });
   const start = fake.runtimeSent.find((m) => m.type === "tab:start");
   assert.deepEqual(start, {
@@ -211,4 +216,102 @@ test("điều phối nghe cả thẻ: offscreen lỗi thì báo lỗi, không gh
     /không có âm thanh/,
   );
   assert.equal((await live.status(3)).active, false);
+});
+
+test("tìm khung có video: nạp script vào khung chưa có, chọn video lớn nhất", async () => {
+  const calls = [];
+  const scripting = {
+    executeScript: async ({ target, func, files }) => {
+      calls.push({ target, func: func?.name, files });
+      if (func?.name === "bundleLoaded")
+        return [
+          { frameId: 0, result: true },
+          { frameId: 3, result: false },
+        ];
+      if (func?.name === "mediaInfo")
+        return [
+          { frameId: 0, result: { area: 100, key: "html5:top" } },
+          { frameId: 3, result: { area: 5000, key: "html5:frame" } },
+          { frameId: 4, result: null },
+        ];
+      return [];
+    },
+  };
+  const link = createMediaLink({ scripting, bundleFiles: () => ["a.js"] });
+  assert.deepEqual(await link.find(9), { frameId: 3, key: "html5:frame" });
+  assert.deepEqual(calls[1], {
+    target: { tabId: 9, frameIds: [3] },
+    func: undefined,
+    files: ["a.js"],
+  });
+  const none = createMediaLink({
+    scripting: {
+      executeScript: async () => {
+        throw new Error("no access");
+      },
+    },
+    bundleFiles: () => [],
+  });
+  assert.equal(await none.find(9), null);
+});
+
+test("điều phối nghe cả thẻ: có video thật thì gửi lời chép tới khung đó; có lời chép thì đọc lại", async () => {
+  const fake = fakeChrome();
+  const { live } = coordinator(fake, {
+    findMedia: async () => ({ frameId: 5, key: "html5:frame" }),
+  });
+  const state = await live.start({ tabId: 7, streamId: "S" });
+  assert.equal(state.linked, true);
+  assert.equal(state.key, "html5:frame");
+  assert.ok(
+    fake.sent.some((s) => s.message.event === "started" && s.frameId === 5),
+  );
+  await live.relay({
+    event: "segment",
+    segment: { start: 1, end: 2, text: "a" },
+  });
+  assert.equal(fake.sent.at(-1).frameId, 5);
+  const again = fakeChrome();
+  const replaying = coordinator(again, {
+    findMedia: async () => ({ frameId: 5, key: "html5:frame" }),
+    hasTranscript: async (key) => key === "html5:frame",
+  });
+  assert.deepEqual(await replaying.live.start({ tabId: 7, streamId: "S" }), {
+    tabId: 7,
+    replay: true,
+  });
+  assert.ok(
+    again.sent.some(
+      (s) =>
+        s.message.type === "ltv:toggle" && s.message.force && s.frameId === 5,
+    ),
+  );
+  assert.equal(again.runtimeSent.length, 0);
+  assert.equal((await replaying.live.status(7)).active, false);
+});
+
+test("quy đổi thời gian thu → thời gian video theo các lần phát/dừng/tua", () => {
+  const video = new EventTarget();
+  Object.assign(video, {
+    currentTime: 0,
+    paused: false,
+    seeking: false,
+    ended: false,
+    playbackRate: 1,
+  });
+  let capture = 0;
+  const map = LTV.createTimeMap({ video, now: () => capture });
+  const at = (seconds, change) => {
+    capture = seconds;
+    Object.assign(video, change);
+    video.dispatchEvent(new Event(change.paused ? "pause" : "play"));
+  };
+  at(3, { currentTime: 3, paused: true });
+  at(5, { currentTime: 3, paused: false });
+  at(8, { currentTime: 30, paused: false, playbackRate: 2 });
+  assert.equal(map.toVideo(2), 2);
+  assert.equal(map.toVideo(4), 3);
+  assert.equal(map.toVideo(6), 4);
+  assert.equal(map.toVideo(9), 32);
+  map.dispose();
 });

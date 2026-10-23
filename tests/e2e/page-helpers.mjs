@@ -39,3 +39,8 @@ export function checker() {
   };
   return { failures, check };
 }
+
+export async function tabIdOf(worker, pathPart) {
+  const tabs = await worker.evaluate(() => chrome.tabs.query({}));
+  return tabs.find((tab) => tab.url?.includes(pathPart))?.id;
+}

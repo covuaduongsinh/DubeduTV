@@ -1,9 +1,11 @@
 // Điều phối "Nghe âm thanh cả thẻ": mỗi lúc một thẻ. Popup xin luồng âm thanh
 // của thẻ (chrome.tabCapture chỉ cho từ thao tác của người dùng), service
-// worker bảo các khung trong thẻ tạm dừng lồng tiếng riêng, nhờ offscreen
-// document thu và chép lời, rồi chuyển lời chép tới trang chính của thẻ để
-// dịch và đọc. Trạng thái lưu ở storage.session để vẫn đúng khi service
-// worker khởi động lại.
+// worker tìm khung chứa video mà tiện ích với tới được (media-link.js), bảo
+// các khung tạm dừng lồng tiếng riêng, nhờ offscreen document thu và chép
+// lời, rồi chuyển lời chép tới khung có video (hoặc trang chính khi không
+// với tới video) để dịch và đọc. Video đã có lời chép đủ phủ thì lồng tiếng
+// lại theo lời chép ngay trong khung, không cần thu âm thanh. Trạng thái lưu
+// ở storage.session để vẫn đúng khi service worker khởi động lại.
 
 const STATE_KEY = "ltv-tab-live";
 const PING_ATTEMPTS = 10;
@@ -39,11 +41,45 @@ async function speechSetup(readSettings, hasWhisperKey) {
   return { engine, lang };
 }
 
+// Offscreen thu âm thanh thẻ và chép lời; trả về bộ chép lời và lúc bắt đầu.
+async function startCapture(deps, streamId) {
+  const { engine, lang } = await speechSetup(
+    deps.readSettings,
+    deps.hasWhisperKey,
+  );
+  await deps.offscreenDoc.ensure({ media: true });
+  const reply = await deps.runtime.sendMessage({
+    target: "offscreen",
+    type: "tab:start",
+    streamId,
+    lang,
+    engine,
+  });
+  if (!reply?.ok)
+    throw new Error(reply?.error || "Không thu được âm thanh của thẻ");
+  return { engine, lang, startedAt: reply.startedAt };
+}
+
+// Đã có lời chép: bật lồng tiếng thường trong khung video (đọc khớp thời
+// gian như video có phụ đề), không cần thu âm thanh thẻ.
+async function replayInFrame(tabs, tabId, media) {
+  await tabs.sendMessage(
+    tabId,
+    { type: "ltv:toggle", force: true },
+    { frameId: media.frameId },
+  );
+  return { tabId, replay: true };
+}
+
 export function createTabLive({
   offscreenDoc,
   injectTopFrame,
   readSettings,
   hasWhisperKey,
+  // → { frameId, key } của khung có video, hoặc null.
+  findMedia = async () => null,
+  // → true nếu video có lời chép đủ phủ để đọc lại.
+  hasTranscript = async () => false,
   tabs = chrome.tabs,
   runtime = chrome.runtime,
   session = chrome.storage.session,
@@ -57,11 +93,12 @@ export function createTabLive({
   const save = (state) =>
     state ? session.set({ [STATE_KEY]: state }) : session.remove(STATE_KEY);
 
-  const toTop = (tabId, message) =>
+  // Khung nhận lời chép: khung có video, hoặc trang chính.
+  const toFrame = (state, message) =>
     tabs.sendMessage(
-      tabId,
+      state.tabId,
       { type: "ltv:tabLive", ...message },
-      { frameId: 0 },
+      { frameId: state.frameId ?? 0 },
     );
 
   async function stop(reason = "") {
@@ -72,30 +109,34 @@ export function createTabLive({
     runtime
       .sendMessage({ target: "offscreen", type: "tab:stop" })
       .catch(() => {});
-    toTop(state.tabId, { event: "stopped", reason }).catch(() => {});
+    toFrame(state, { event: "stopped", reason }).catch(() => {});
   }
 
   async function start({ tabId, streamId }) {
     const previous = await current();
     if (previous) await stop("Đã chuyển sang nghe thẻ khác.");
     await ensureTopFrame(tabs, tabId, injectTopFrame);
+    const media = await findMedia(tabId);
     // Video trong các khung của thẻ đang tự lồng tiếng thì tạm dừng.
     tabs.sendMessage(tabId, { type: "ltv:pause" }).catch(() => {});
-    const { engine, lang } = await speechSetup(readSettings, hasWhisperKey);
-    await offscreenDoc.ensure({ media: true });
-    const reply = await runtime.sendMessage({
-      target: "offscreen",
-      type: "tab:start",
+    if (media && (await hasTranscript(media.key)))
+      return replayInFrame(tabs, tabId, media);
+    const { engine, lang, startedAt } = await startCapture(
+      { offscreenDoc, runtime, readSettings, hasWhisperKey },
       streamId,
+    );
+    const state = {
+      tabId,
+      startedAt,
       lang,
       engine,
-    });
-    if (!reply?.ok)
-      throw new Error(reply?.error || "Không thu được âm thanh của thẻ");
-    const state = { tabId, startedAt: reply.startedAt, lang, engine };
+      frameId: media?.frameId ?? 0,
+      linked: Boolean(media),
+      key: media?.key || "",
+    };
     await save(state);
     failures = 0;
-    await toTop(tabId, { event: "started", ...state });
+    await toFrame(state, { event: "started", ...state });
     return state;
   }
 
@@ -108,7 +149,7 @@ export function createTabLive({
       return;
     }
     try {
-      await toTop(state.tabId, event);
+      await toFrame(state, event);
       failures = 0;
     } catch {
       failures += 1;

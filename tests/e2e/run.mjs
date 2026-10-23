@@ -17,7 +17,12 @@ import {
 } from "./live-scenarios.mjs";
 import { waitForStatus } from "./page-helpers.mjs";
 import { addonScenarios } from "./addon-scenarios.mjs";
-import { frameScenarios, tabLiveScenario } from "./frame-scenarios.mjs";
+import { frameScenarios } from "./frame-scenarios.mjs";
+import {
+  linkedTabScenario,
+  replayTabScenario,
+  unlinkedTabScenario,
+} from "./tab-scenarios.mjs";
 import { startServer } from "./server.mjs";
 import { cloudVoiceScenario } from "./voice-scenarios.mjs";
 import {
@@ -167,7 +172,9 @@ function selectScenarios(context, worker) {
     voices: [() => cloudVoiceScenario(context, { baseUrl, worker })],
     live: [
       () => interimScenario(context, { baseUrl, worker }),
-      () => tabLiveScenario(context, { baseUrl, worker }),
+      () => unlinkedTabScenario(context, { baseUrl, worker }),
+      () => linkedTabScenario(context, { baseUrl, worker }),
+      () => replayTabScenario(context, { baseUrl, worker }),
     ],
   };
   const wanted = (process.env.LTV_E2E_GROUPS || Object.keys(groups).join(","))

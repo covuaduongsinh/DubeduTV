@@ -15,6 +15,7 @@ import { testWhisperKey, transcribeWhisper } from "./transcribe-whisper.js";
 import { createTranscriptStore } from "./transcripts.js";
 import { createLibrary } from "./library.js";
 import { createTabLive } from "./tab-live.js";
+import { createMediaLink } from "./media-link.js";
 
 const LTV = globalThis.LTV;
 const MAX_FETCH_BYTES = 8 * 1024 * 1024;
@@ -250,12 +251,17 @@ async function injectBundle(tabId) {
   });
 }
 
+const mediaLink = createMediaLink({ bundleFiles: isolatedContentFiles });
+
 const tabLive = createTabLive({
   offscreenDoc,
   injectTopFrame: injectBundle,
   readSettings,
   hasWhisperKey: async () =>
     Boolean((await chrome.storage.local.get("whisperApiKey")).whisperApiKey),
+  findMedia: (tabId) => mediaLink.find(tabId),
+  hasTranscript: async (key) =>
+    (await transcripts.get(key))?.coverage >= LTV.TRANSCRIPT_MIN_COVERAGE,
 });
 
 // "Thử lồng tiếng trang này".

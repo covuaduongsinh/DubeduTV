@@ -146,3 +146,31 @@ export function feedPage() {
 }
 
 export const THUMB_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#456"/></svg>`;
+
+// Trình phát video thường (không phải YouTube) trong khung: nút toàn màn hình
+// cho cả khung trình phát và chính <video>.
+export function plainFramePage() {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Plain player</title></head>
+<body style="margin:0;background:#000">
+<div id="player" style="position:relative;width:640px;height:360px">
+  <video src="/media/tone7.wav" style="width:100%;height:100%"></video>
+</div>
+<button id="fs-player">player</button><button id="fs-video">video</button>
+<script>
+document.getElementById("fs-player").onclick = () => document.getElementById("player").requestFullscreen();
+document.getElementById("fs-video").onclick = () => document.querySelector("video").requestFullscreen();
+</script></body></html>`;
+}
+
+// Trang nhúng trình phát từ origin khác, kèm một khung nhỏ (quảng cáo) từ
+// origin tiện ích không có quyền.
+export function mediaHostPage(frameOrigin, adOrigin) {
+  const ad = adOrigin
+    ? `<iframe src="${adOrigin}/plain-frame" width="160" height="90"></iframe>`
+    : "";
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Chess lesson – embedded player</title></head>
+<body style="margin:0;background:#222">
+<iframe src="${frameOrigin}/plain-frame" width="660" height="400" allow="autoplay; fullscreen" allowfullscreen></iframe>
+${ad}
+</body></html>`;
+}

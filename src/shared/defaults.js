@@ -95,6 +95,9 @@
     return "";
   };
 
+  // Lời chép tự động phủ ít nhất ngần này thời lượng video thì dùng như phụ đề.
+  LTV.TRANSCRIPT_MIN_COVERAGE = 0.9;
+
   // Giới hạn hợp lệ cho các cài đặt dạng số.
   const NUMBER_RANGES = {
     rate: [0.5, 2.5],

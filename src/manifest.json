@@ -32,6 +32,7 @@
     "scripting",
     "tabCapture"
   ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://m.youtube.com/*",
@@ -108,6 +109,7 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/tab-linked.js",
         "content/tab-live.js",
         "content/badges.js",
         "content/quiz.js",
@@ -169,6 +171,7 @@
         "content/live-session.js",
         "content/voice-fallback.js",
         "content/sites/drive-host.js",
+        "content/tab-linked.js",
         "content/tab-live.js",
         "content/badges.js",
         "content/quiz.js",

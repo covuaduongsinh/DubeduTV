@@ -6,8 +6,6 @@
 
   const CONTEXT_LINES = 3;
   const MAX_RECENT = 20;
-  // Lời chép đã lưu phủ ít nhất ngần này thời lượng thì dùng như phụ đề.
-  const TRANSCRIPT_MIN_COVERAGE = 0.9;
 
   // Dịch một câu vừa chép, kèm vài câu trước làm ngữ cảnh.
   LTV.translateLive = async function translateLive(
@@ -45,7 +43,7 @@
     } catch {
       entry = null;
     }
-    if (!entry || !(entry.coverage >= TRANSCRIPT_MIN_COVERAGE)) return null;
+    if (!entry || !(entry.coverage >= LTV.TRANSCRIPT_MIN_COVERAGE)) return null;
     return {
       cues: entry.cues,
       lang: entry.lang,
