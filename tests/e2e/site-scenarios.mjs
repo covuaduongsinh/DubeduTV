@@ -113,6 +113,12 @@ export async function youtubeChecks(page, check) {
     sawRequest(/^\/api\/timedtext.*pot=TOKEN/),
     "không bắt được timedtext có pot",
   );
+  // Tiện ích không nằm trên đường gửi XHR của trang (lỗi của script khác
+  // không bị ghi thành lỗi của tiện ích).
+  const nativeSend = await page.evaluate(() =>
+    /\[native code\]/.test(XMLHttpRequest.prototype.send.toString()),
+  );
+  check(nativeSend, "XMLHttpRequest.prototype.send bị tiện ích bọc lại");
 }
 
 export function udemyChecks() {

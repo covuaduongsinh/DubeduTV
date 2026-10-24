@@ -153,6 +153,8 @@ export function youtubePage({ layout = "watch" } = {}) {
       if (value && value.languageCode) {
         document.body.dataset.setOptionCalls = String(Number(document.body.dataset.setOptionCalls || 0) + 1);
         const xhr = new XMLHttpRequest();
+        // XHR dùng lại: mở với URL khác trước, URL phụ đề sau cùng.
+        xhr.open("GET", "/generate_204");
         xhr.open("GET", "/api/timedtext?v=" + videoId + "&lang=en&kind=asr&fmt=json3&pot=TOKEN");
         xhr.send();
       }

@@ -124,34 +124,39 @@
     };
   }
 
+  // XHR: chỉ bọc open (ghi URL, gắn một bộ nghe "load" cho mỗi XHR). Không bọc
+  // send: hàm bọc nằm trên đường gửi của mọi XHR trong trang thì Chrome ghi lỗi
+  // của script khác (vd. script Kaspersky chèn vào trang bị chặn) thành lỗi
+  // của tiện ích.
+  function onXhrLoad() {
+    const kind = this.__ltvUrl ? classify(this.__ltvUrl) : null;
+    if (!kind) return;
+    try {
+      let text = null;
+      if (this.responseType === "" || this.responseType === "text")
+        text = this.responseText;
+      else if (this.responseType === "json")
+        text = JSON.stringify(this.response);
+      publish(kind, absolute(this.responseURL || this.__ltvUrl), text);
+    } catch {
+      // Bỏ qua phản hồi không đọc được.
+    }
+  }
+
   const xhrProto = XMLHttpRequest.prototype;
   const originalOpen = xhrProto.open;
-  const originalSend = xhrProto.send;
   xhrProto.open = function (method, url) {
     try {
       this.__ltvUrl = String(url);
+      // XHR mở lại nhiều lần vẫn chỉ có một bộ nghe; lúc load đọc URL mới nhất.
+      if (!this.__ltvListening && classify(this.__ltvUrl)) {
+        this.__ltvListening = true;
+        this.addEventListener("load", onXhrLoad);
+      }
     } catch {
       this.__ltvUrl = "";
     }
     return originalOpen.apply(this, arguments);
-  };
-  xhrProto.send = function () {
-    const kind = this.__ltvUrl ? classify(this.__ltvUrl) : null;
-    if (kind) {
-      this.addEventListener("load", () => {
-        try {
-          let text = null;
-          if (this.responseType === "" || this.responseType === "text")
-            text = this.responseText;
-          else if (this.responseType === "json")
-            text = JSON.stringify(this.response);
-          publish(kind, absolute(this.responseURL || this.__ltvUrl), text);
-        } catch {
-          // Bỏ qua phản hồi không đọc được.
-        }
-      });
-    }
-    return originalSend.apply(this, arguments);
   };
 
   function youtubePlayer() {

@@ -48,7 +48,7 @@ cả thẻ**.
 
 Tải tệp zip của bản mới nhất ở mục **Releases** của repo (hoặc tự build theo mục _Dành cho nhà phát triển_).
 
-1. Giải nén tệp `long-tieng-viet-v1.3.2.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
+1. Giải nén tệp `long-tieng-viet-v1.3.3.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
    thư mục rồi bấm biểu tượng tải lại ↻ của tiện ích trong `chrome://extensions`.)
 2. Mở Chrome, vào `chrome://extensions`, bật **Chế độ dành cho nhà phát triển** (góc phải trên).
 3. Bấm **Tải tiện ích đã giải nén** (Load unpacked) → chọn thư mục `long-tieng-viet`.
@@ -176,6 +176,9 @@ máy và chỉ gửi tới `api.anthropic.com`.
   Nếu mọi cách đều bị chặn, tiện ích ngừng gọi Google 1 phút, dịch bằng **Chrome trên máy** nếu máy đã tải gói
   dịch, và báo rõ lý do trên video. Tuỳ chọn → **Kiểm tra kết nối Google Dịch** cho biết từng cách gọi đang qua
   được hay bị chặn.
+- Phần mềm diệt virus như Kaspersky có thể chèn script của nó vào trang video. Lỗi của script đó (vd.
+  “Unsafe attempt to load URL …kaspersky-labs.com…”) không liên quan tới tiện ích; từ 1.3.3 tiện ích không còn
+  nằm trên đường gửi yêu cầu của trang nên Chrome không ghi các lỗi này vào trang Lỗi của tiện ích nữa.
 - Không có đăng nhập/máy chủ đồng bộ bản dịch: mọi thứ chạy trên máy người dùng.
 
 ## Quyền riêng tư
@@ -198,7 +201,7 @@ Tiện ích chạy không cần thư viện; công cụ phát triển cần Node
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
 npm test            # 120 unit test (node --test)
 npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
-npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.2.zip
+npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.3.zip
 npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
                     # CHROMIUM_PATH nếu không ở /opt/pw-browsers/chromium – và mạng tới translate.googleapis.com)
 LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live
