@@ -25,6 +25,8 @@
     .pill:hover { opacity: 1; }
     .pill.on { background: #0f766e; opacity: 1; }
     [hidden] { display: none !important; }
+    /* Đang quay video: ẩn thông báo và nút, chỉ giữ phụ đề. */
+    :host([data-recording]) .status, :host([data-recording]) .pill { display: none !important; }
   `;
 
   function fontSize(base, width) {
@@ -205,6 +207,7 @@
       setPill(visible) {
         pill.hidden = !visible;
       },
+      setRecording: (on) => host.toggleAttribute("data-recording", Boolean(on)),
       isAttached: () => host.isConnected && (!video || video.isConnected),
       destroy() {
         clearTimeout(statusTimer);

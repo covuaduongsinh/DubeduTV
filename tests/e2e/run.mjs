@@ -23,6 +23,7 @@ import {
   replayTabScenario,
   unlinkedTabScenario,
 } from "./tab-scenarios.mjs";
+import { recordScenario } from "./record-scenarios.mjs";
 import { startServer } from "./server.mjs";
 import { cloudVoiceScenario } from "./voice-scenarios.mjs";
 import {
@@ -170,6 +171,7 @@ function selectScenarios(context, worker) {
     frames: frameScenarios(context, { baseUrl, worker }),
     addons: addonScenarios(context, { baseUrl, worker }),
     voices: [() => cloudVoiceScenario(context, { baseUrl, worker })],
+    record: [() => recordScenario(context, { baseUrl, worker })],
     live: [
       () => interimScenario(context, { baseUrl, worker }),
       () => unlinkedTabScenario(context, { baseUrl, worker }),

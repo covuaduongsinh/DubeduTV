@@ -6,12 +6,21 @@
 (function (root) {
   const LTV = (root.LTV = root.LTV || {});
 
-  LTV.openTabStream = function openTabStream(streamId) {
+  // video: true khi quay video lồng tiếng (hình của thẻ, tối đa 1080p 30 hình/giây).
+  LTV.openTabStream = function openTabStream(streamId, { video = false } = {}) {
+    const source = { chromeMediaSource: "tab", chromeMediaSourceId: streamId };
     return navigator.mediaDevices.getUserMedia({
-      audio: {
-        mandatory: { chromeMediaSource: "tab", chromeMediaSourceId: streamId },
-      },
-      video: false,
+      audio: { mandatory: source },
+      video: video
+        ? {
+            mandatory: {
+              ...source,
+              maxWidth: 1920,
+              maxHeight: 1080,
+              maxFrameRate: 30,
+            },
+          }
+        : false,
     });
   };
 

@@ -16,6 +16,7 @@ import { createTranscriptStore } from "./transcripts.js";
 import { createLibrary } from "./library.js";
 import { createTabLive } from "./tab-live.js";
 import { createMediaLink } from "./media-link.js";
+import { createRecorder } from "./recorder.js";
 
 const LTV = globalThis.LTV;
 const MAX_FETCH_BYTES = 8 * 1024 * 1024;
@@ -146,7 +147,7 @@ const portHandlers = {
       lang: message.lang,
       rate: message.rate,
       volume: message.volume,
-      engine: message.engine,
+      engine: await voiceEngineFor(ctx.tabId, message.engine),
       voiceName: message.voiceName,
     });
   },
@@ -197,7 +198,18 @@ const portHandlers = {
   "tabLive:stop": (message, ctx) => {
     tabLive.stopIfTab(ctx.tabId, "Đã dừng nghe cả thẻ.");
   },
+  "record:layout": (message, ctx) => recorder.fromFrame(ctx, message),
+  "record:line": (message, ctx) => recorder.fromFrame(ctx, message),
+  "record:ended": (message, ctx) => recorder.fromFrame(ctx, message),
 };
+
+// Giọng máy (chrome.tts) không ghi vào video được: khi thẻ đang quay thì đọc
+// bằng giọng Google.
+async function voiceEngineFor(tabId, engine) {
+  if (engine === "system" && (await recorder.isRecording(tabId)))
+    return "google";
+  return engine;
+}
 
 async function handlePortMessage(port, ctx, message) {
   const handler = portHandlers[message?.type];
@@ -223,8 +235,11 @@ chrome.runtime.onConnect.addListener((port) => {
     if (ports.get(ctx.owner) !== port) return;
     ports.delete(ctx.owner);
     speech.stop(ctx.owner);
-    // Trang chính rời đi (điều hướng, đóng thẻ): thôi nghe cả thẻ.
-    if (ctx.frameId === 0) tabLive.stopIfTab(ctx.tabId).catch(() => {});
+    // Trang chính rời đi (điều hướng, đóng thẻ): thôi nghe cả thẻ, dừng quay.
+    if (ctx.frameId === 0) {
+      tabLive.stopIfTab(ctx.tabId).catch(() => {});
+      recorder.stopIfTab(ctx.tabId, "navigated").catch(() => {});
+    }
   });
 });
 
@@ -262,6 +277,11 @@ const tabLive = createTabLive({
   findMedia: (tabId) => mediaLink.find(tabId),
   hasTranscript: async (key) =>
     (await transcripts.get(key))?.coverage >= LTV.TRANSCRIPT_MIN_COVERAGE,
+});
+
+const recorder = createRecorder({
+  offscreenDoc,
+  isTabLive: async (tabId) => (await tabLive.status(tabId)).active,
 });
 
 // "Thử lồng tiếng trang này".
@@ -327,9 +347,24 @@ const messageHandlers = {
     await injectIntoTab(message.tabId);
     return { ok: true };
   },
-  "ltv:tabLive:start": async (message) => ({
+  "ltv:tabLive:start": async (message) => {
+    if (await recorder.isRecording(message.tabId))
+      throw new Error(
+        "Thẻ này đang quay video – dừng quay trước khi nghe cả thẻ.",
+      );
+    return { ok: true, ...(await tabLive.start(message)) };
+  },
+  "ltv:record:start": async (message) => ({
     ok: true,
-    ...(await tabLive.start(message)),
+    ...(await recorder.start(message)),
+  }),
+  "ltv:record:stop": async () => ({
+    ok: true,
+    ...(await recorder.stop("user")),
+  }),
+  "ltv:record:status": async (message) => ({
+    ok: true,
+    ...(await recorder.status(message.tabId)),
   }),
   "ltv:tabLive:stop": async () => {
     await tabLive.stop("Đã dừng nghe cả thẻ.");
@@ -350,6 +385,8 @@ function handleOffscreenMessage(message, sendResponse) {
     return true;
   } else if (message.type === "tabLive:event")
     tabLive.relay(message).catch(() => {});
+  else if (message.type === "record:event")
+    recorder.fromOffscreen(message).catch(() => {});
   else if (message.type === "offscreen:asr") {
     transcribeChunk(message.message || {}).then((reply) =>
       sendResponse({ type: "asr", ...reply }),
@@ -382,6 +419,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   tabLive.stopIfTab(tabId).catch(() => {});
+  recorder.stopIfTab(tabId).catch(() => {});
 });
 
 // Phím tắt: đang nghe cả thẻ thì dừng; không thì bật/tắt ở khung có video

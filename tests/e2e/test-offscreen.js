@@ -11,14 +11,36 @@
     [9.8, 13.0, "It can jump over other pieces."],
   ];
 
+  // Hình giả khi quay video: "trang" 1280×720 đổi màu liên tục, ô video
+  // 640×360 ở (320, 180) có khung trắng để thấy vùng cắt.
+  function fakeVideoTrack() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1280;
+    canvas.height = 720;
+    const context = canvas.getContext("2d");
+    let tick = 0;
+    setInterval(() => {
+      tick += 1;
+      context.fillStyle = "#222";
+      context.fillRect(0, 0, 1280, 720);
+      context.fillStyle = `hsl(${(tick * 12) % 360}, 70%, 45%)`;
+      context.fillRect(320, 180, 640, 360);
+      context.strokeStyle = "#fff";
+      context.strokeRect(321, 181, 638, 358);
+    }, 33);
+    return canvas.captureStream(30).getVideoTracks()[0];
+  }
+
   const realOpen = LTV.openTabStream;
-  LTV.openTabStream = async function openTabStream(streamId) {
-    if (!String(streamId).startsWith("test:")) return realOpen(streamId);
+  LTV.openTabStream = async function openTabStream(streamId, options = {}) {
+    if (!String(streamId).startsWith("test:"))
+      return realOpen(streamId, options);
     const context = new AudioContext();
     const tone = context.createOscillator();
     const output = context.createMediaStreamDestination();
     tone.connect(output);
     tone.start();
+    if (options.video) output.stream.addTrack(fakeVideoTrack());
     return output.stream;
   };
 

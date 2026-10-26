@@ -52,3 +52,9 @@ footer {
   justify-content: space-between;
   font-size: 12px;
 }
+
+#record.recording {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}

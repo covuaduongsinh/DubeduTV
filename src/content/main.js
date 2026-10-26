@@ -37,6 +37,12 @@
   const voice = LTV.createVoiceFallback({ connection, getSettings, setStatus });
   const effectiveSettings = voice.effectiveSettings;
   const auto = LTV.createAutoStart({ connection, getSettings, isTop });
+  // Quay video lồng tiếng: khung đang lồng tiếng báo vị trí video và phụ đề.
+  const recording = LTV.createRecordingReporter({
+    connection,
+    getVideo: () => state.session?.video || null,
+    getOverlay: () => state.ui.overlay,
+  });
   let addons = null;
 
   const html5 = () => LTV.providers.find((item) => item.id === "html5");
@@ -178,7 +184,7 @@
       makeSpeech: () =>
         LTV.createSpeechClient({ connection, getSettings: effectiveSettings }),
       setStatus,
-      onLine: (sentence) => state.ui.overlay?.setLine(sentence),
+      onLine: recording.show,
       onSpeechResult: voice.handle,
     });
     await session.live.start();
@@ -270,7 +276,7 @@
         lang: state.settings.targetLang,
         isSuspended: () => Boolean(provider.isSuspended?.()),
         ensureTranslated: (index) => session.queue?.ensureFrom(index),
-        onLine: (sentence) => state.ui.overlay?.setLine(sentence),
+        onLine: recording.show,
         onSpeechResult: voice.handle,
       });
       // Dịch trước từ chỗ đang xem (link có &t=… mở giữa video).
@@ -443,6 +449,12 @@
       sendResponse({ ok: true, top: isTop });
     } else if (message?.type === "ltv:pause") {
       pause();
+    } else if (message?.type === "ltv:record:begin") {
+      sendResponse(recording.begin());
+    } else if (message?.type === "ltv:record:end") {
+      sendResponse(recording.end());
+    } else if (message?.type === "ltv:record:sync") {
+      sendResponse(recording.sync());
     }
     return false;
   }

@@ -1,6 +1,7 @@
 import "../shared/defaults.js";
 import "../shared/frame-probe.js";
 import { initChromePack } from "./chrome-pack.js";
+import { initRecord } from "./record.js";
 import { initTabLive } from "./tab-live.js";
 import { initVoiceSelect } from "./voice-select.js";
 
@@ -130,10 +131,20 @@ const tabLive = initTabLive({
   onChange: () => refreshStatus(),
 });
 
+const record = initRecord({
+  getTab: () => tab,
+  getFrameId: () => frameId ?? 0,
+  onChange: () => refreshStatus(),
+});
+
 function renderStatus(status) {
   // Đang nghe cả thẻ: không bật lồng tiếng riêng trong trang (tránh đọc trùng).
   tabLive.refresh(status).then((listening) => {
     if (listening) $("toggle").hidden = true;
+  });
+  // Đang quay: không nghe cả thẻ cùng lúc (Chrome không cho thu thẻ hai lần).
+  record.refresh(status).then((recording) => {
+    if (recording) $("tab-live").hidden = true;
   });
   if (status?.lang && status.lang !== lastStatus?.lang) {
     lastStatus = status;

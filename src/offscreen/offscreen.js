@@ -96,6 +96,8 @@
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(blob);
       const audio = new Audio();
+      // Đang quay video: giọng đọc đi vào file quay.
+      recorder.attachVoice(audio);
       const cleanup = () => URL.revokeObjectURL(url);
       audio.preservesPitch = true;
       audio.defaultPlaybackRate = session.rate;
@@ -185,6 +187,30 @@
     return false;
   }
 
+  const recorder = LTV.createRecorder({
+    send: (event) =>
+      chrome.runtime
+        .sendMessage({ target: "background", type: "record:event", ...event })
+        .catch(() => {}),
+  });
+
+  function recordCommand(message, sendResponse) {
+    const reply = (promise) => {
+      promise.then(
+        (result) => sendResponse({ ok: true, ...result }),
+        (error) => sendResponse({ ok: false, error: error?.message }),
+      );
+      return true;
+    };
+    if (message.type === "rec:start") return reply(recorder.start(message));
+    if (message.type === "rec:stop")
+      return reply(recorder.stop(message.reason));
+    if (message.type === "rec:status") sendResponse(recorder.status());
+    else if (message.type === "rec:layout") recorder.layout(message.layout);
+    else if (message.type === "rec:line") recorder.line(message);
+    return false;
+  }
+
   function translate(message, sendResponse) {
     LTV.chromeAI
       .translate(message)
@@ -200,6 +226,8 @@
     if (message.type === "translate") return translate(message, sendResponse);
     if (message.type?.startsWith("tab:"))
       return tabCommand(message, sendResponse);
+    if (message.type?.startsWith("rec:"))
+      return recordCommand(message, sendResponse);
     if (message.type === "play") play(message);
     else if (message.type === "stop") stop();
     else if (message.type === "prefetch") {

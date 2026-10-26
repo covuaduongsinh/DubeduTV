@@ -5,7 +5,7 @@ video nhúng), Udemy, Coursera, Google Drive, X/Twitter**: lấy phụ đề s�
 động) – hoặc **tự nghe và chép lời khi video không có phụ đề** – dịch sang tiếng Việt, rồi đọc từng câu, đồng
 thời giảm tiếng gốc khi đang đọc. Mã viết mới hoàn toàn bởi Công ty CP Cờ vua Dương Sinh. Bản 1.3 thêm
 **từ điển thuật ngữ cờ vua**, **giọng AI tự nhiên (Azure, Google Cloud)** và **điều khiển video nhúng khi nghe
-cả thẻ**.
+cả thẻ**; bản 1.4 thêm **quay video lồng tiếng** thành file MP4/WebM kèm phụ đề .srt.
 
 ## Tính năng
 
@@ -38,6 +38,9 @@ cả thẻ**.
 - **Huy hiệu “Đã lồng”** trên ảnh video YouTube đã có bản dịch/lời chép trên máy, và chế độ tự bật
   **“Chỉ video đã lồng trước đây”**.
 - Video đã có phụ đề tiếng Việt thủ công thì đọc thẳng, không cần dịch.
+- **Quay video lồng tiếng**: quay vùng video kèm giọng Việt, tiếng gốc đã giảm và phụ đề đang hiện, lưu thành
+  file **MP4** (hoặc WebM) và phụ đề **.srt** khớp thời gian file quay – để xem lại, chiếu cho học viên, dựng
+  tiếp trong CapCut/Premiere.
 - **Bộ nhớ đệm** bản dịch theo video (150 video gần nhất): xem lại không phải dịch lại.
 - Nút **VI** trên thanh điều khiển YouTube, nút nổi trên video Udemy/Coursera/Shorts/X, phím tắt
   **Alt+Shift+D** (chọn đúng video, kể cả video nhúng).
@@ -48,7 +51,7 @@ cả thẻ**.
 
 Tải tệp zip của bản mới nhất ở mục **Releases** của repo (hoặc tự build theo mục _Dành cho nhà phát triển_).
 
-1. Giải nén tệp `long-tieng-viet-v1.3.3.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
+1. Giải nén tệp `long-tieng-viet-v1.4.0.zip` → được thư mục `long-tieng-viet`. (Cập nhật từ bản cũ: chép đè
    thư mục rồi bấm biểu tượng tải lại ↻ của tiện ích trong `chrome://extensions`.)
 2. Mở Chrome, vào `chrome://extensions`, bật **Chế độ dành cho nhà phát triển** (góc phải trên).
 3. Bấm **Tải tiện ích đã giải nén** (Load unpacked) → chọn thư mục `long-tieng-viet`.
@@ -91,6 +94,20 @@ dừng. Mỗi lúc chỉ nghe một thẻ.
   nhất như trước.
 - **Lần sau** mở lại video đã có lời chép đủ dài, bấm **Nghe âm thanh cả thẻ** sẽ lồng tiếng lại khớp thời
   gian theo lời chép đã lưu – không cần thu âm thanh nữa.
+
+### Quay video lồng tiếng
+
+1. Bật lồng tiếng cho video như bình thường (nên dùng giọng Google hoặc giọng AI – giọng máy không ghi vào file
+   được, nên khi quay tiện ích tự đọc bằng giọng Google).
+2. Nên bấm **toàn màn hình** để hình nét nhất (tối đa 1920×1080) và để chuột ra ngoài video. Trong lúc quay,
+   thanh điều khiển của YouTube và các nút của tiện ích được ẩn; phụ đề vẫn hiện như cài đặt phụ đề.
+3. Bấm biểu tượng tiện ích → **⏺ Quay video lồng tiếng**, rồi cho video phát. Quay **trong lúc phát** nên mất
+   thời gian bằng đoạn quay (quay từng đoạn được).
+4. Bấm **⏹ Dừng & lưu video** trong popup (hoặc để video tự hết, hay đóng thẻ). Trang **Video lồng tiếng** mở
+   ra: xem thử, **Tải video** và **Tải phụ đề tiếng Việt (.srt)**. Tiện ích giữ 3 bản quay gần nhất trên máy;
+   popup → **Xem các bản quay đã lưu** để mở lại.
+
+Video của người khác chỉ dùng để học tập, giảng dạy nội bộ; muốn đăng lại cần được tác giả cho phép.
 
 ### Dịch câu hỏi trắc nghiệm
 
@@ -179,6 +196,11 @@ máy và chỉ gửi tới `api.anthropic.com`.
 - Phần mềm diệt virus như Kaspersky có thể chèn script của nó vào trang video. Lỗi của script đó (vd.
   “Unsafe attempt to load URL …kaspersky-labs.com…”) không liên quan tới tiện ích; từ 1.3.3 tiện ích không còn
   nằm trên đường gửi yêu cầu của trang nên Chrome không ghi các lỗi này vào trang Lỗi của tiện ích nữa.
+- Quay video lồng tiếng: quay theo thời gian thực (1 giờ video = 1 giờ quay); video có DRM (Netflix, một số
+  khoá học trả phí) ra hình đen; giọng máy không ghi được nên khi quay tự dùng giọng Google; câu đang đọc đúng
+  lúc bấm quay có thể bị ngắt (Chrome khởi động lại bộ phát để cấp quyền quay); không quay cùng lúc với
+  **Nghe âm thanh cả thẻ**. Video trong khung nhúng (không toàn màn hình) được quay cả trang. Chrome có H.264
+  thì ghi MP4, không thì WebM (file WebM của trình duyệt không ghi sẵn thời lượng – vẫn xem và dựng được).
 - Không có đăng nhập/máy chủ đồng bộ bản dịch: mọi thứ chạy trên máy người dùng.
 
 ## Quyền riêng tư
@@ -186,7 +208,8 @@ máy và chỉ gửi tới `api.anthropic.com`.
 Tiện ích không có máy chủ riêng. Nội dung phụ đề được gửi tới Google Dịch hoặc Claude (tuỳ lựa chọn) để dịch
 – bộ dịch **Chrome trên máy** dịch ngay trên máy, không gửi đi đâu – và câu cần đọc được gửi tới Google khi
 dùng giọng Google, tới Azure hoặc Google Cloud khi dùng giọng AI tương ứng. Huy hiệu “Đã lồng” chỉ tra bộ nhớ trên máy. Quyền `tabCapture` chỉ dùng khi người dùng bấm
-**Nghe âm thanh cả thẻ**; âm thanh của thẻ được chép lời giống như khi tự chép lời video. Quyền chạy trên
+**Nghe âm thanh cả thẻ** hoặc **Quay video lồng tiếng**; âm thanh của thẻ được chép lời giống như khi tự chép
+lời video, còn bản quay video chỉ lưu trên máy (IndexedDB của tiện ích), không gửi đi đâu. Quyền chạy trên
 trang chứa video nhúng là quyền tuỳ chọn: chỉ hỏi khi bấm **Nghe âm thanh cả thẻ**, chỉ cho trang đó, dùng để
 nạp tiện ích vào khung video (dừng/phát video, hiện phụ đề, đọc khoá video để lưu lời chép). Khi tự chép lời, âm thanh của video được gửi tới
 dịch vụ nhận dạng của Google Chrome (hoặc nhận dạng ngay trên máy nếu Chrome có sẵn gói ngôn ngữ), hoặc tới
@@ -199,12 +222,13 @@ Tiện ích chạy không cần thư viện; công cụ phát triển cần Node
 
 ```bash
 npm ci              # cài oxlint, oxfmt, playwright-core (chỉ dùng khi phát triển)
-npm test            # 120 unit test (node --test)
+npm test            # 131 unit test (node --test)
 npm run check       # lint + kiểm định dạng + unit test (CI chạy lệnh này)
-npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.3.3.zip
+npm run build       # → dist/long-tieng-viet/ và dist/long-tieng-viet-v1.4.0.zip
 npm run e2e         # build bản --test và chạy Chromium thật trên trang giả lập (cần Chromium – đặt
                     # CHROMIUM_PATH nếu không ở /opt/pw-browsers/chromium – và mạng tới translate.googleapis.com)
-LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices, live
+LTV_E2E_GROUPS=frames,live npm run e2e   # chỉ chạy một số nhóm: base, youtube, frames, addons, voices,
+                                         # record, live
 ```
 
 CI (GitHub Actions) chạy `npm run check` và `npm run build` trên Node 22 và 24, đính kèm tệp zip vào mỗi lần
@@ -217,11 +241,14 @@ src/
   manifest.json
   background/   service worker: chọn bộ dịch (Google/Chrome/Claude) kèm từ điển thuật ngữ, chép lời Whisper,
                 giọng đọc (tts.js) và giọng AI Azure/Google Cloud (tts-cloud.js), cache bản dịch theo bộ
-                dịch thật và lời chép, tra cứu "đã lồng", điều phối nghe cả thẻ (tab-live.js) và tìm khung
-                có video (media-link.js)
-  offscreen/    phát giọng Google/giọng AI, dịch trên máy (Translator API), nghe âm thanh cả thẻ
+                dịch thật và lời chép, tra cứu "đã lồng", điều phối nghe cả thẻ (tab-live.js), tìm khung
+                có video (media-link.js) và điều phối quay video (recorder.js)
+  offscreen/    phát giọng Google/giọng AI, dịch trên máy (Translator API), nghe âm thanh cả thẻ, quay video
+                (recorder.js: cắt vùng video, trộn tiếng thẻ + giọng đọc, MediaRecorder)
+  recorder/     trang xem/tải bản quay
   shared/       cài đặt, từ điển thuật ngữ (glossary.js), giọng AI theo ngôn ngữ, bộ dịch Chrome trên máy,
-                chọn khung (trang chính / video nhúng)
+                chọn khung (trang chính / video nhúng), phép tính và kho bản quay (record-math.js,
+                recordings-db.js)
   content/
     page-hook.js   (MAIN world) bắt phụ đề/playlist trình phát tải về (fetch, XHR, Resource Timing),
                    gọi API trình phát YouTube
@@ -232,6 +259,7 @@ src/
     asr/           chép lời: Chrome (Web Speech API nhận audio track) và Whisper (ghi âm theo đoạn)
     live-*.js      video không phụ đề: thu âm → chép lời → dịch → đọc nối tiếp/song song
     tab-live.js    nghe cả thẻ – phía trang; tab-linked.js – khi có video thật trong khung
+    recording.js   quay video – phía trang: báo vị trí video và câu phụ đề, ẩn thanh điều khiển
     quiz.js, badges.js, addons.js – phần chạy kèm
     main.js        điều phối theo tab/khung, điều hướng SPA, tự bật
   popup/, options/ giao diện
@@ -246,7 +274,10 @@ của X, API bài giảng Udemy + VTT khác origin, thẻ `<track>` của Course
 Chromium được gọi thật (gói en→vi chưa tải nên kiểm đường dự phòng). Nghe cả thẻ được kiểm bằng luồng âm
 thanh giả trong offscreen vì headless không bấm được biểu tượng tiện ích; khung trình phát trên origin có
 quyền (nạp script, nối tiếp, toàn màn hình, lưu và đọc lại lời chép) và origin không có quyền (đọc song song);
-hộp thoại xin quyền của popup chưa kiểm được trong headless. Giọng AI được kiểm bằng máy chủ giả lập Azure/
+hộp thoại xin quyền của popup chưa kiểm được trong headless. Quay video được kiểm bằng luồng thẻ giả (tiếng
+tone + hình canvas) với giọng AI giả lập phát thật trong offscreen: file ra đúng tỉ lệ vùng video, có giọng
+đọc, phụ đề .srt theo giờ quay, trang tải mở sau khi dừng; Chromium thử nghiệm không có H.264 nên chỉ kiểm
+WebM. Giọng AI được kiểm bằng máy chủ giả lập Azure/
 Google Cloud, cộng một lần gọi Google Cloud thật với key sai; chưa đọc thử bằng key thật, Azure thật không
 truy cập được từ môi trường kiểm thử. Chưa kiểm thử trên các site thật,
 chưa nghe giọng Google thật, chưa thử tải gói dịch Chrome, chưa đo chất lượng/độ trễ chép lời thật của Chrome
